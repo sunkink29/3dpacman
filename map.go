@@ -5,7 +5,6 @@ import (
 	"log"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/go-gl/gl/v4.1-core/gl"
 	"github.com/go-gl/mathgl/mgl32"
@@ -38,7 +37,6 @@ func (curMap Map) GetSaveableMap() string {
 }
 
 func LoadMap(stringMap string) *Map {
-	mapLoadStart := time.Now()
 	sliceMap := strings.Split(stringMap, "")
 	mapWidth64, _ := strconv.ParseInt(strings.Join(sliceMap[0:2], ""), 16, 64)
 	mapHeight64, _ := strconv.ParseInt(strings.Join(sliceMap[2:4], ""), 16, 64)
@@ -62,7 +60,6 @@ func LoadMap(stringMap string) *Map {
 			}
 		}
 
-		fmt.Println(time.Now().Sub(mapLoadStart).Seconds())
 		return &newMap
 	} else {
 		fmt.Println("Error loading map: given map size and given map data do not match")

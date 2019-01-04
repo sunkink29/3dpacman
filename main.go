@@ -5,7 +5,6 @@ import (
 	"go/build"
 	_ "image/png"
 	"log"
-	"os"
 	"runtime"
 	"time"
 
@@ -22,6 +21,7 @@ const frameRate float64 = 60
 var projectionMat mgl32.Mat4
 var mapWidth = 28
 var mapHeight = 31
+var showFrameTime = false
 
 func init() {
 	// GLFW event handling must run on the main OS thread
@@ -101,7 +101,7 @@ func main() {
 		window.SwapBuffers()
 		glfw.PollEvents()
 
-		curFrameTime := previousTime.Sub(time.Now())
+		curFrameTime := time.Now().Sub(previousTime)
 		if curFrameTime.Seconds() < 1/frameRate {
 			time.Sleep(time.Duration((1.0/(frameRate) - curFrameTime.Seconds()) * float64(time.Second)))
 		}
@@ -110,14 +110,14 @@ func main() {
 
 // Set the working directory to the root of Go package, so that its assets can be accessed.
 func init() {
-	dir, err := importPathToDir("github.com/sunkink29/3dpacman/")
-	if err != nil {
-		log.Fatalln("Unable to find Go package in your GOPATH, it's needed to load assets:", err)
-	}
-	err = os.Chdir(dir)
-	if err != nil {
-		log.Panicln("os.Chdir:", err)
-	}
+	// dir, err := importPathToDir("github.com/sunkink29/3dpacman/")
+	// if err != nil {
+	// 	log.Fatalln("Unable to find Go package in your GOPATH, it's needed to load assets:", err)
+	// }
+	// err = os.Chdir(dir)
+	// if err != nil {
+	// 	log.Panicln("os.Chdir:", err)
+	// }
 }
 
 // importPathToDir resolves the absolute path from importPath.
