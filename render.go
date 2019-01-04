@@ -7,8 +7,16 @@ import (
 	"os"
 	"strings"
 
+	"github.com/go-gl/mathgl/mgl32"
+
 	"github.com/go-gl/gl/v4.1-core/gl"
 )
+
+type Camera struct {
+	cameraPos        *mgl32.Vec3
+	projectionMatrix *mgl32.Mat4
+	viewMatrix       *mgl32.Mat4
+}
 
 func newProgram(vertexShaderSource, fragmentShaderSource string) (uint32, error) {
 	vertexShader, err := compileShader(vertexShaderSource, gl.VERTEX_SHADER)

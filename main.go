@@ -18,10 +18,7 @@ const windowHeight = 600
 const speed = 5
 const frameRate float64 = 60
 
-var projectionMat mgl32.Mat4
-var mapWidth = 28
-var mapHeight = 31
-var showFrameTime = false
+var startMapSize = [2]int{28, 31}
 
 func init() {
 	// GLFW event handling must run on the main OS thread
@@ -56,11 +53,14 @@ func main() {
 	version := gl.GoStr(gl.GetString(gl.VERSION))
 	fmt.Println("OpenGL version", version)
 
-	projectionMat = mgl32.Perspective(mgl32.DegToRad(45.0), float32(windowWidth)/windowHeight, 30.0, 50.0)
+	cameraPos := mgl32.Vec3{14, 0, 15.5}
+	projectionMat := mgl32.Perspective(mgl32.DegToRad(45.0), float32(windowWidth)/windowHeight, 30.0, 50.0)
+	viewMat := mgl32.LookAtV(cameraPos.Add(mgl32.Vec3{0, 40, 0}), cameraPos, mgl32.Vec3{0, 1, 0})
+	camera := Camera{&cameraPos, &projectionMat, &viewMat}
 
-	initTileRendering()
+	initTileRendering(camera)
 
-	curMap := createEmptyMap([2]int{mapWidth, mapHeight})
+	curMap := createEmptyMap(startMapSize)
 
 	testTile := newTile([2]int{-2, 0}, 0)
 
@@ -72,10 +72,7 @@ func main() {
 	// angle := 0.0
 	previousTime := time.Now()
 
-	cameraPos := mgl32.Vec3{14, 0, 15.5}
-	viewMat := mgl32.LookAtV(cameraPos.Add(mgl32.Vec3{0, 40, 0}), cameraPos, mgl32.Vec3{0, 1, 0})
-
-	setMouseButtonCallback(window, projectionMat, &viewMat, &curMap, &testTile)
+	setMouseButtonCallback(window, camera, &curMap, &testTile)
 	setKeyCallback(window, &testTile, &curMap)
 
 	for !window.ShouldClose() {
@@ -95,7 +92,7 @@ func main() {
 		// Render
 
 		curMap.Render(viewMat)
-		testTile.Render(viewMat)
+		testTile.Render()
 
 		// Maintenance
 		window.SwapBuffers()

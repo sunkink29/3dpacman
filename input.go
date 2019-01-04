@@ -8,13 +8,13 @@ import (
 
 	"github.com/go-gl/glfw/v3.2/glfw"
 	"github.com/go-gl/mathgl/mgl32"
-	"github.com/sqweek/dialog"
+	"github.com/scorpheus/dialog"
 )
 
-func setMouseButtonCallback(window *glfw.Window, matProjection mgl32.Mat4, viewMat *mgl32.Mat4, curMap *Map, testTile *Tile) {
+func setMouseButtonCallback(window *glfw.Window, camera Camera, curMap *Map, testTile *Tile) {
 	window.SetMouseButtonCallback(
 		func(w *glfw.Window, button glfw.MouseButton, action glfw.Action, mod glfw.ModifierKey) {
-			onMouseButton(w, button, action, mod, matProjection.Mul4(*viewMat).Inv(), curMap, testTile)
+			onMouseButton(w, button, action, mod, camera.projectionMatrix.Mul4(*camera.viewMatrix).Inv(), curMap, testTile)
 		})
 }
 
@@ -25,7 +25,7 @@ func onMouseButton(w *glfw.Window, button glfw.MouseButton, action glfw.Action,
 		worldPointf := screenToWorldSpace(w, [2]float64{mouseX, mouseY}, matProjection)
 		worldPointf = worldPointf.Mul(1.04)
 		worldPoint := []int{int(math.Floor(float64(worldPointf[0]))), int(math.Floor(float64(worldPointf[2])))}
-		if worldPoint[0] >= 0 && worldPoint[1] >= 0 && worldPoint[0] < mapWidth && worldPoint[1] < mapHeight {
+		if worldPoint[0] >= 0 && worldPoint[1] >= 0 && worldPoint[0] < curMap.size[0] && worldPoint[1] < curMap.size[1] {
 			tile := &curMap.tMap[worldPoint[0]][worldPoint[1]]
 			if button == glfw.MouseButton1 {
 				tile.tileOptions = testTile.tileOptions
@@ -75,7 +75,6 @@ func onKeyPress(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, 
 				fmt.Println("Error: dialog box canceled/closed")
 				return
 			}
-			// fmt.Println(strings.Contains(filename, ".pmap"))
 			if !strings.Contains(filename, ".pmap") {
 				filename += ".pmap"
 			}
@@ -83,7 +82,6 @@ func onKeyPress(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, 
 			if err != nil {
 				fmt.Println(err)
 			}
-			// fmt.Println("map:", curMap.GetSaveableMap())
 		} else if key == glfw.KeyV {
 			mapDir, err := dialog.File().Filter("*.pmap", "pmap").Load()
 			if err != nil {
@@ -100,8 +98,6 @@ func onKeyPress(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, 
 			newMap := LoadMap(mapString)
 			if newMap != nil {
 				*curMap = *newMap
-				mapWidth = newMap.size[0]
-				mapHeight = newMap.size[1]
 			}
 		}
 		testTile.tileOptions = curTileOptions

@@ -42,7 +42,6 @@ func LoadMap(stringMap string) *Map {
 	mapHeight64, _ := strconv.ParseInt(strings.Join(sliceMap[2:4], ""), 16, 64)
 	mapWidth := int(mapWidth64)
 	mapHeight := int(mapHeight64)
-	// fmt.Println(mapWidth*mapHeight*4+4, len(sliceMap), sliceMap[0:2], sliceMap[2:4], sliceMap)
 	if len(sliceMap) == mapWidth*mapHeight*4+4 {
 		newMap := createEmptyMap([2]int{mapWidth, mapHeight})
 		for i, col := range newMap.tMap {
@@ -77,11 +76,11 @@ type Tile struct {
 var tVao, tProgram uint32
 var renderWireframe int32
 
-func (curMap Map) Render(camera mgl32.Mat4) {
+func (curMap Map) Render(viewMatrix mgl32.Mat4) {
 	gl.UseProgram(tProgram)
 
 	cameraUniform := gl.GetUniformLocation(tProgram, gl.Str("camera\x00"))
-	gl.UniformMatrix4fv(cameraUniform, 1, false, &camera[0])
+	gl.UniformMatrix4fv(cameraUniform, 1, false, &viewMatrix[0])
 
 	textures := [6]int32{1, 2, 3, 4, 5, 6}
 
@@ -93,13 +92,13 @@ func (curMap Map) Render(camera mgl32.Mat4) {
 
 	for _, col := range curMap.tMap {
 		for _, row := range col {
-			row.Render(camera)
+			row.Render()
 		}
 	}
 }
 
 // can not render only a tile without rendering a map
-func (tile Tile) Render(camera mgl32.Mat4) {
+func (tile Tile) Render() {
 	model := mgl32.Translate3D(float32(tile.pos[0]), 0, float32(tile.pos[1]))
 	modelUniform := gl.GetUniformLocation(tile.program, gl.Str("model\x00"))
 	gl.UniformMatrix4fv(modelUniform, 1, false, &model[0])
@@ -137,6 +136,7 @@ func createEmptyMap(size [2]int) Map {
 		tiles[colIndex] = col
 		mMap[colIndex] = make([]int, size[1])
 	}
+
 	return Map{size, tiles, mMap}
 }
 
@@ -145,7 +145,7 @@ func newTile(pos [2]int, texture int32) Tile {
 	return Tile{tVao, tProgram, pos, texture}
 }
 
-func initTileRendering() {
+func initTileRendering(camera Camera) {
 	// Configure the vertex and fragment shaders
 	program, err := newProgram(vertexShader, tileFragShader)
 	if err != nil {
@@ -154,7 +154,7 @@ func initTileRendering() {
 	gl.UseProgram(program)
 
 	projectionUniform := gl.GetUniformLocation(program, gl.Str("projection\x00"))
-	gl.UniformMatrix4fv(projectionUniform, 1, false, &projectionMat[0])
+	gl.UniformMatrix4fv(projectionUniform, 1, false, &camera.projectionMatrix[0])
 
 	gl.BindFragDataLocation(program, 0, gl.Str("outputColor\x00"))
 
