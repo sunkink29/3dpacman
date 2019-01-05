@@ -1,7 +1,9 @@
 package main
 
 import (
+	"errors"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"strconv"
 	"strings"
@@ -17,53 +19,6 @@ type Map struct {
 	size [2]int
 	tMap [][]Tile // tile map: array that holds the tile vao and program
 	mMap [][]int  // movement map: array that holds what directions the player can go at any point
-}
-
-func (curMap Map) GetSaveableMap() string {
-	var mapString string
-
-	mapString += fmt.Sprintf("%0*X%0*X", 2, curMap.size[0], 2, curMap.size[1])
-	for _, col := range curMap.tMap {
-		for _, tile := range col {
-			mapString += fmt.Sprintf("%0*X", 2, tile.tileOptions)
-		}
-	}
-	for _, col := range curMap.mMap {
-		for _, move := range col {
-			mapString += fmt.Sprintf("%0*X", 2, move)
-		}
-	}
-	return mapString
-}
-
-func LoadMap(stringMap string) *Map {
-	sliceMap := strings.Split(stringMap, "")
-	mapWidth64, _ := strconv.ParseInt(strings.Join(sliceMap[0:2], ""), 16, 64)
-	mapHeight64, _ := strconv.ParseInt(strings.Join(sliceMap[2:4], ""), 16, 64)
-	mapWidth := int(mapWidth64)
-	mapHeight := int(mapHeight64)
-	if len(sliceMap) == mapWidth*mapHeight*4+4 {
-		newMap := createEmptyMap([2]int{mapWidth, mapHeight})
-		for i, col := range newMap.tMap {
-			for j := range col {
-				curStrIndex := (i*mapHeight+j)*2 + 4
-				tileOptions, _ := strconv.ParseInt(strings.Join(sliceMap[curStrIndex:curStrIndex+2], ""), 16, 32)
-				newMap.tMap[i][j].tileOptions = int32(tileOptions)
-			}
-		}
-		for i, col := range newMap.tMap {
-			for j := range col {
-				curStrIndex := mapWidth*mapHeight*2 + (i*mapHeight+j)*2 + 4
-				movement, _ := strconv.ParseInt(strings.Join(sliceMap[curStrIndex:curStrIndex+1], ""), 16, 0)
-				newMap.mMap[i][j] = int(movement)
-			}
-		}
-
-		return &newMap
-	} else {
-		fmt.Println("Error loading map: given map size and given map data do not match")
-		return nil
-	}
 }
 
 // Tile holds the vao and program pointers
@@ -143,6 +98,72 @@ func createEmptyMap(size [2]int) Map {
 func newTile(pos [2]int, texture int32) Tile {
 
 	return Tile{tVao, tProgram, pos, texture}
+}
+
+func (curMap Map) getSaveableMap() string {
+	var mapString string
+
+	mapString += fmt.Sprintf("%0*X%0*X", 2, curMap.size[0], 2, curMap.size[1])
+	for _, col := range curMap.tMap {
+		for _, tile := range col {
+			mapString += fmt.Sprintf("%0*X", 2, tile.tileOptions)
+		}
+	}
+	for _, col := range curMap.mMap {
+		for _, move := range col {
+			mapString += fmt.Sprintf("%0*X", 2, move)
+		}
+	}
+	return mapString
+}
+
+func (curMap Map) SaveToFile(filename string) error {
+	curMapString := curMap.getSaveableMap()
+	if !strings.HasSuffix(filename, ".pmap") {
+		filename += ".pmap"
+	}
+	err := ioutil.WriteFile(filename, []byte(curMapString), 0644)
+	return errors.New(fmt.Sprint("Error Saving Map to file:", err))
+}
+
+func LoadMapFromString(stringMap string) *Map {
+	sliceMap := strings.Split(stringMap, "")
+	mapWidth64, _ := strconv.ParseInt(strings.Join(sliceMap[0:2], ""), 16, 64)
+	mapHeight64, _ := strconv.ParseInt(strings.Join(sliceMap[2:4], ""), 16, 64)
+	mapWidth := int(mapWidth64)
+	mapHeight := int(mapHeight64)
+	if len(sliceMap) == mapWidth*mapHeight*4+4 {
+		newMap := createEmptyMap([2]int{mapWidth, mapHeight})
+		for i, col := range newMap.tMap {
+			for j := range col {
+				curStrIndex := (i*mapHeight+j)*2 + 4
+				tileOptions, _ := strconv.ParseInt(strings.Join(sliceMap[curStrIndex:curStrIndex+2], ""), 16, 32)
+				newMap.tMap[i][j].tileOptions = int32(tileOptions)
+			}
+		}
+		for i, col := range newMap.tMap {
+			for j := range col {
+				curStrIndex := mapWidth*mapHeight*2 + (i*mapHeight+j)*2 + 4
+				movement, _ := strconv.ParseInt(strings.Join(sliceMap[curStrIndex:curStrIndex+1], ""), 16, 0)
+				newMap.mMap[i][j] = int(movement)
+			}
+		}
+
+		return &newMap
+	} else {
+		fmt.Println("Error loading map: given map size and given map data do not match")
+		return nil
+	}
+}
+
+func LoadMapFromFile(filename string) (*Map, error) {
+	mapBytes, err := ioutil.ReadFile(filename)
+	if err != nil {
+		return nil, errors.New(fmt.Sprint("Error Reading Map:", err))
+	}
+	mapString := string(mapBytes)
+
+	return LoadMapFromString(mapString), nil
 }
 
 func initTileRendering(camera Camera) {

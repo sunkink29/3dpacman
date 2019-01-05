@@ -2,9 +2,7 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	"math"
-	"strings"
 
 	"github.com/go-gl/glfw/v3.2/glfw"
 	"github.com/go-gl/mathgl/mgl32"
@@ -69,36 +67,27 @@ func onKeyPress(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, 
 		} else if key == glfw.KeyX {
 			renderWireframe ^= 1
 		} else if key == glfw.KeyC {
-			curMapString := curMap.GetSaveableMap()
 			filename, err := dialog.File().Filter("*.pmap", "pmap").Title("Save Map").Save()
 			if err != nil {
-				fmt.Println("Error: dialog box canceled/closed")
+				fmt.Println("Error getting map filename:", err)
 				return
 			}
-			if !strings.Contains(filename, ".pmap") {
-				filename += ".pmap"
-			}
-			err = ioutil.WriteFile(filename, []byte(curMapString), 0644)
+			err = curMap.SaveToFile(filename)
 			if err != nil {
 				fmt.Println(err)
 			}
 		} else if key == glfw.KeyV {
-			mapDir, err := dialog.File().Filter("*.pmap", "pmap").Load()
+			filename, err := dialog.File().Filter("*.pmap", "pmap").Load()
 			if err != nil {
-				fmt.Println("Error: dialog box canceled/closed")
+				fmt.Println("Error getting map filename:", err)
 				return
 			}
-			mapBytes, err := ioutil.ReadFile(mapDir)
+			newMap, err := LoadMapFromFile(filename)
 			if err != nil {
-				fmt.Println("Error Reading Map:", err)
+				fmt.Println(err)
 				return
 			}
-			mapString := string(mapBytes)
-
-			newMap := LoadMap(mapString)
-			if newMap != nil {
-				*curMap = *newMap
-			}
+			*curMap = *newMap
 		}
 		testTile.tileOptions = curTileOptions
 	}
