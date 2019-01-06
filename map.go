@@ -3,6 +3,8 @@ package main
 import (
 	"errors"
 	"fmt"
+	"github.com/go-gl/glfw/v3.2/glfw"
+	"github.com/scorpheus/dialog"
 	"io/ioutil"
 	"log"
 	"strconv"
@@ -123,7 +125,10 @@ func (curMap Map) SaveToFile(filename string) error {
 		filename += ".pmap"
 	}
 	err := ioutil.WriteFile(filename, []byte(curMapString), 0644)
-	return errors.New(fmt.Sprint("Error Saving Map to file:", err))
+	if err != nil {
+		return errors.New(fmt.Sprint("Error Saving Map to file:", err))
+	}
+	return nil
 }
 
 func LoadMapFromString(stringMap string) *Map {
@@ -217,6 +222,57 @@ func initTileRendering(camera Camera) {
 
 	tVao = vao
 	tProgram = program
+}
+
+func RegisterMapBindings(curMap *Map, tTile *Tile) {
+	RegisterKeyBinding(glfw.KeyW, "Toggle Up Wall Tile", func(w *glfw.Window, mods glfw.ModifierKey) {
+		tTile.tileOptions = (tTile.tileOptions ^ 0x1)&0xF
+	})
+	RegisterKeyBinding(glfw.KeyS, "Toggle Down Wall Tile", func(w *glfw.Window, mods glfw.ModifierKey) {
+		tTile.tileOptions = (tTile.tileOptions ^ 0x2) & 0xF
+	})
+	RegisterKeyBinding(glfw.KeyA, "Toggle Left Wall Tile", func(w *glfw.Window, mods glfw.ModifierKey) {
+		tTile.tileOptions = (tTile.tileOptions ^ 0x4) & 0xF
+	})
+	RegisterKeyBinding(glfw.KeyD, "Toggle Right Wall Tile", func(w *glfw.Window, mods glfw.ModifierKey) {
+		tTile.tileOptions = (tTile.tileOptions ^ 0x8) & 0xF
+	})
+	RegisterKeyBinding(glfw.KeyE, "Toggle Dot Tile", func(w *glfw.Window, mods glfw.ModifierKey) {
+		tTile.tileOptions = (tTile.tileOptions ^ 0x10) & 0x10
+	})
+	RegisterKeyBinding(glfw.KeyQ, "Toggle Big Dot Tile", func(w *glfw.Window, mods glfw.ModifierKey) {
+		tTile.tileOptions = (tTile.tileOptions ^ 0x20) & 0x20
+	})
+	RegisterKeyBinding(glfw.KeyZ, "Clear Tile", func(w *glfw.Window, mods glfw.ModifierKey) {
+		tTile.tileOptions = 0x0
+	})
+	RegisterKeyBinding(glfw.KeyX, "Toggle WireFrame", func(w *glfw.Window, mods glfw.ModifierKey) {
+		renderWireframe ^= 1
+	})
+	RegisterKeyBinding(glfw.KeyC, "Load Map", func(w *glfw.Window, mods glfw.ModifierKey) {
+		filename, err := dialog.File().Filter("*.pmap", "pmap").Load()
+		if err != nil {
+			fmt.Println("Error getting map filename:", err)
+			return
+		}
+		newMap, err := LoadMapFromFile(filename)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		*curMap = *newMap
+	})
+	RegisterKeyBinding(glfw.KeyV, "Save Map", func(w *glfw.Window, mods glfw.ModifierKey) {
+		filename, err := dialog.File().Filter("*.pmap", "pmap").Title("Save Map").Save()
+		if err != nil {
+			fmt.Println("Error getting map filename:", err)
+			return
+		}
+		err = curMap.SaveToFile(filename)
+		if err != nil {
+			fmt.Println(err)
+		}
+	})
 }
 
 var planeVertices = []float32{

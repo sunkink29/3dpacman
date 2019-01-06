@@ -6,8 +6,11 @@ import (
 
 	"github.com/go-gl/glfw/v3.2/glfw"
 	"github.com/go-gl/mathgl/mgl32"
-	"github.com/scorpheus/dialog"
 )
+
+func init() {
+	registeredKeyBinding = make(map[glfw.Key]keyBinding)
+}
 
 func setMouseButtonCallback(window *glfw.Window, camera Camera, curMap *Map, testTile *Tile) {
 	window.SetMouseButtonCallback(
@@ -34,62 +37,27 @@ func onMouseButton(w *glfw.Window, button glfw.MouseButton, action glfw.Action,
 	}
 }
 
-func setKeyCallback(window *glfw.Window, testTile *Tile, curMap *Map) {
-	window.SetKeyCallback(
-		func(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
-			onKeyPress(w, key, scancode, action, mods, testTile, curMap)
-		})
+type KeyCallback func(w *glfw.Window, mods glfw.ModifierKey)
+type keyBinding struct {
+	name     string
+	callback func(w *glfw.Window, mods glfw.ModifierKey)
 }
 
-func onKeyPress(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey, testTile *Tile, curMap *Map) {
-	if action == glfw.Release {
-		curTileOptions := testTile.tileOptions
-		if key == glfw.KeyW {
-			curTileOptions ^= 0x1
-			curTileOptions &= 0xF
-		} else if key == glfw.KeyS {
-			curTileOptions ^= 0x2
-			curTileOptions &= 0xF
-		} else if key == glfw.KeyA {
-			curTileOptions ^= 0x4
-			curTileOptions &= 0xF
-		} else if key == glfw.KeyD {
-			curTileOptions ^= 0x8
-			curTileOptions &= 0xF
-		} else if key == glfw.KeyE {
-			curTileOptions ^= 0x10
-			curTileOptions &= 0x10
-		} else if key == glfw.KeyQ {
-			curTileOptions ^= 0x20
-			curTileOptions &= 0x20
-		} else if key == glfw.KeyZ {
-			curTileOptions = 0x0
-		} else if key == glfw.KeyX {
-			renderWireframe ^= 1
-		} else if key == glfw.KeyC {
-			filename, err := dialog.File().Filter("*.pmap", "pmap").Title("Save Map").Save()
-			if err != nil {
-				fmt.Println("Error getting map filename:", err)
-				return
-			}
-			err = curMap.SaveToFile(filename)
-			if err != nil {
-				fmt.Println(err)
-			}
-		} else if key == glfw.KeyV {
-			filename, err := dialog.File().Filter("*.pmap", "pmap").Load()
-			if err != nil {
-				fmt.Println("Error getting map filename:", err)
-				return
-			}
-			newMap, err := LoadMapFromFile(filename)
-			if err != nil {
-				fmt.Println(err)
-				return
-			}
-			*curMap = *newMap
-		}
-		testTile.tileOptions = curTileOptions
+var registeredKeyBinding map[glfw.Key]keyBinding
+
+func RegisterKeyBinding(key glfw.Key, name string, callback KeyCallback) {
+	binding, ok := registeredKeyBinding[key]
+	if !ok {
+		registeredKeyBinding[key] = keyBinding{name, callback}
+	} else {
+		fmt.Printf("Error binding key %v: key %v is bound to %v\n", name, key, binding.name)
+	}
+}
+
+func OnKeyPress(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
+	binding, ok := registeredKeyBinding[key]
+	if ok && action == glfw.Release {
+		binding.callback(w, mods)
 	}
 }
 

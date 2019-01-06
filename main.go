@@ -53,6 +53,8 @@ func main() {
 	version := gl.GoStr(gl.GetString(gl.VERSION))
 	fmt.Println("OpenGL version", version)
 
+	window.SetKeyCallback(OnKeyPress)
+
 	cameraPos := mgl32.Vec3{14, 0, 15.5}
 	projectionMat := mgl32.Perspective(mgl32.DegToRad(45.0), float32(windowWidth)/windowHeight, 30.0, 50.0)
 	viewMat := mgl32.LookAtV(cameraPos.Add(mgl32.Vec3{0, 40, 0}), cameraPos, mgl32.Vec3{0, 1, 0})
@@ -73,7 +75,7 @@ func main() {
 	previousTime := time.Now()
 
 	setMouseButtonCallback(window, camera, &curMap, &testTile)
-	setKeyCallback(window, &testTile, &curMap)
+	RegisterMapBindings(&curMap, &testTile)
 
 	for !window.ShouldClose() {
 		gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
