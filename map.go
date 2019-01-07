@@ -39,7 +39,7 @@ func (curMap Map) Render(viewMatrix mgl32.Mat4) {
 	cameraUniform := gl.GetUniformLocation(tProgram, gl.Str("camera\x00"))
 	gl.UniformMatrix4fv(cameraUniform, 1, false, &viewMatrix[0])
 
-	textures := [6]int32{1, 2, 3, 4, 5, 6}
+	textures := []int32{1, 2, 3, 4, 5, 6, 7}
 
 	textureUniform := gl.GetUniformLocation(tProgram, gl.Str("tex\x00"))
 	gl.Uniform1iv(textureUniform, int32(len(textures)), &textures[0])
@@ -65,9 +65,9 @@ func (tile Tile) Render() {
 	gl.Uniform1i(tileOptionsUniform, tile.tileOptions)
 
 	var color mgl32.Vec4
-	if tile.tileOptions&0xF != 0 {
+	if tile.tileOptions&0x1F != 0 {
 		color = mgl32.Vec4{0, 0, 1, 1}
-	} else if tile.tileOptions&0x30 != 0 {
+	} else if tile.tileOptions&0x60 != 0 {
 		color = mgl32.Vec4{1, 1, 0, 1}
 	}
 	// fmt.Println("color", color)
@@ -100,6 +100,52 @@ func createEmptyMap(size [2]int) Map {
 func newTile(pos [2]int, texture int32) Tile {
 
 	return Tile{tVao, tProgram, pos, texture}
+}
+
+func (curMap *Map) ChangeTileOptions(tile *Tile, tileOptions int32) {
+	tile.tileOptions = tileOptions
+	if tileOptions&0xF == 0 {
+		curMap.updateNearbyWall(tile, tileOptions)
+	}
+}
+
+func (curMap *Map) updateNearbyWall(tile *Tile, tileOptions int32) {
+	deleteWall := int32(0)
+	if tileOptions&0x10 != 0 {
+		deleteWall = 0xF
+	}
+	if tile.pos[1] > 0 {
+		top := &curMap.tMap[tile.pos[0]][tile.pos[1]-1]
+		if top.tileOptions&0x1F != 0 {
+			tile.tileOptions |= 0x1 & deleteWall
+			top.tileOptions |= 0x2
+			top.tileOptions &= 0xF ^ (0x2 & (deleteWall ^ 0xF))
+		}
+	}
+	if tile.pos[1] < curMap.size[1]-1 {
+		bottem := &curMap.tMap[tile.pos[0]][tile.pos[1]+1]
+		if bottem.tileOptions&0x1F != 0 {
+			tile.tileOptions |= 0x2 & deleteWall
+			bottem.tileOptions |= 0x1
+			bottem.tileOptions &= 0xF ^ (0x1 & (deleteWall ^ 0xF))
+		}
+	}
+	if tile.pos[0] > 0 {
+		left := &curMap.tMap[tile.pos[0]-1][tile.pos[1]]
+		if left.tileOptions&0x1F != 0 {
+			tile.tileOptions |= 0x4 & deleteWall
+			left.tileOptions |= 0x8
+			left.tileOptions &= 0xF ^ (0x8 & (deleteWall ^ 0xF))
+		}
+	}
+	if tile.pos[0] < curMap.size[0]-1 {
+		right := &curMap.tMap[tile.pos[0]+1][tile.pos[1]]
+		if right.tileOptions&0x1F != 0 {
+			tile.tileOptions |= 0x8 & deleteWall
+			right.tileOptions |= 0x4
+			right.tileOptions &= 0xF ^ (0x4 & (deleteWall ^ 0xF))
+		}
+	}
 }
 
 func (curMap Map) getSaveableMap() string {
@@ -209,7 +255,7 @@ func initTileRendering(camera Camera) {
 	gl.Uniform1f(aspectUniform, 1)
 
 	// Load the textures
-	textureFileNames := []string{"wallUp", "wallDown", "wallLeft", "wallRight", "dot", "bigDot"}
+	textureFileNames := []string{"wallUp", "wallDown", "wallLeft", "wallRight", "wallAuto", "dot", "bigDot"}
 
 	for i, fileName := range textureFileNames {
 		texture, err := newTexture("textures/" + fileName + ".png")
@@ -226,7 +272,7 @@ func initTileRendering(camera Camera) {
 
 func RegisterMapBindings(curMap *Map, tTile *Tile) {
 	RegisterKeyBinding(glfw.KeyW, "Toggle Up Wall Tile", func(w *glfw.Window, mods glfw.ModifierKey) {
-		tTile.tileOptions = (tTile.tileOptions ^ 0x1)&0xF
+		tTile.tileOptions = (tTile.tileOptions ^ 0x1) & 0xF
 	})
 	RegisterKeyBinding(glfw.KeyS, "Toggle Down Wall Tile", func(w *glfw.Window, mods glfw.ModifierKey) {
 		tTile.tileOptions = (tTile.tileOptions ^ 0x2) & 0xF
@@ -237,11 +283,14 @@ func RegisterMapBindings(curMap *Map, tTile *Tile) {
 	RegisterKeyBinding(glfw.KeyD, "Toggle Right Wall Tile", func(w *glfw.Window, mods glfw.ModifierKey) {
 		tTile.tileOptions = (tTile.tileOptions ^ 0x8) & 0xF
 	})
-	RegisterKeyBinding(glfw.KeyE, "Toggle Dot Tile", func(w *glfw.Window, mods glfw.ModifierKey) {
+	RegisterKeyBinding(glfw.KeyR, "Toggle Auto Wall Tile", func(w *glfw.Window, mods glfw.ModifierKey) {
 		tTile.tileOptions = (tTile.tileOptions ^ 0x10) & 0x10
 	})
-	RegisterKeyBinding(glfw.KeyQ, "Toggle Big Dot Tile", func(w *glfw.Window, mods glfw.ModifierKey) {
+	RegisterKeyBinding(glfw.KeyE, "Toggle Dot Tile", func(w *glfw.Window, mods glfw.ModifierKey) {
 		tTile.tileOptions = (tTile.tileOptions ^ 0x20) & 0x20
+	})
+	RegisterKeyBinding(glfw.KeyQ, "Toggle Big Dot Tile", func(w *glfw.Window, mods glfw.ModifierKey) {
+		tTile.tileOptions = (tTile.tileOptions ^ 0x40) & 0x40
 	})
 	RegisterKeyBinding(glfw.KeyZ, "Clear Tile", func(w *glfw.Window, mods glfw.ModifierKey) {
 		tTile.tileOptions = 0x0
@@ -272,6 +321,14 @@ func RegisterMapBindings(curMap *Map, tTile *Tile) {
 		if err != nil {
 			fmt.Println(err)
 		}
+	})
+	RegisterKeyBinding(glfw.KeyF, "Load Test Map", func(w *glfw.Window, mods glfw.ModifierKey) {
+		newMap, err := LoadMapFromFile("maps/smallTestMap.pmap")
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		*curMap = *newMap
 	})
 }
 

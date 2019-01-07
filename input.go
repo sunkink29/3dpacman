@@ -28,11 +28,13 @@ func onMouseButton(w *glfw.Window, button glfw.MouseButton, action glfw.Action,
 		worldPoint := []int{int(math.Floor(float64(worldPointf[0]))), int(math.Floor(float64(worldPointf[2])))}
 		if worldPoint[0] >= 0 && worldPoint[1] >= 0 && worldPoint[0] < curMap.size[0] && worldPoint[1] < curMap.size[1] {
 			tile := &curMap.tMap[worldPoint[0]][worldPoint[1]]
+			tileChange := int32(0)
 			if button == glfw.MouseButton1 {
-				tile.tileOptions = testTile.tileOptions
+				tileChange = testTile.tileOptions
 			} else if button == glfw.MouseButton2 {
-				tile.tileOptions = 0x0
+				tileChange = 0x0
 			}
+			curMap.ChangeTileOptions(tile, tileChange)
 		}
 	}
 }
