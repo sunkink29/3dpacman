@@ -3,7 +3,9 @@ package main
 import (
 	"fmt"
 	"math"
+	"unsafe"
 
+	"github.com/go-gl/gl/v4.1-core/gl"
 	"github.com/go-gl/glfw/v3.2/glfw"
 	"github.com/go-gl/mathgl/mgl32"
 )
@@ -24,8 +26,7 @@ func onMouseButton(w *glfw.Window, button glfw.MouseButton, action glfw.Action,
 	if action == glfw.Release {
 		mouseX, mouseY := w.GetCursorPos()
 		worldPointf := screenToWorldSpace(w, [2]float64{mouseX, mouseY}, matProjection)
-		worldPointf = worldPointf.Mul(1.04)
-		worldPoint := []int{int(math.Floor(float64(worldPointf[0]))), int(math.Floor(float64(worldPointf[2])))}
+		worldPoint := []int{int(math.Floor(float64(worldPointf[0] + 0.5))), int(math.Floor(float64(worldPointf[2] + 0.5)))}
 		if worldPoint[0] >= 0 && worldPoint[1] >= 0 && worldPoint[0] < curMap.size[0] && worldPoint[1] < curMap.size[1] {
 			tile := &curMap.tMap[worldPoint[0]][worldPoint[1]]
 			tileChange := int32(0)
@@ -64,7 +65,10 @@ func OnKeyPress(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, 
 }
 
 func screenToWorldSpace(window *glfw.Window, point [2]float64, matProjection mgl32.Mat4) mgl32.Vec3 {
-	winZ := float32(0.52)
+	depth := float32(0)
+	pointer := unsafe.Pointer(&depth)
+	gl.ReadPixels(int32(point[0]), windowHeight-int32(point[1]), 1, 1, gl.DEPTH_COMPONENT, gl.FLOAT, pointer)
+	winZ := depth
 
 	var input [4]float32
 	input[0] = (2.0 * (float32(point[0]-0) / (windowWidth - 0))) - 1.0

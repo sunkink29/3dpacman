@@ -56,7 +56,8 @@ func main() {
 	window.SetKeyCallback(OnKeyPress)
 
 	cameraPos := mgl32.Vec3{14, 0, 15.5}
-	projectionMat := mgl32.Perspective(mgl32.DegToRad(45.0), float32(windowWidth)/windowHeight, 30.0, 50.0)
+	// projectionMat := mgl32.Perspective(mgl32.DegToRad(45.0), float32(windowWidth)/windowHeight, 30.0, 50)
+	projectionMat := mgl32.Ortho(-50/2, 50/2, -50*.75/2, 50*.75/2, 30, 50)
 	viewMat := mgl32.LookAtV(cameraPos.Add(mgl32.Vec3{0, 40, 0}), cameraPos, mgl32.Vec3{0, 1, 0})
 	camera := Camera{&cameraPos, &projectionMat, &viewMat}
 
