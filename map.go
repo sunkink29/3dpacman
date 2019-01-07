@@ -123,38 +123,38 @@ func (curMap *Map) ChangeTileOptions(tile *Tile, tileOptions int32) {
 func (curMap *Map) updateNearbyWall(tile *Tile, tileOptions int32) {
 	deleteWall := int32(0)
 	if tileOptions&wallAuto != 0 {
-		deleteWall = wallAll
+		deleteWall = wallAllAuto
 	}
 	if tile.pos[1] > 0 {
 		top := &curMap.tMap[tile.pos[0]][tile.pos[1]-1]
 		if top.tileOptions&wallAllAuto != 0 {
 			tile.tileOptions |= wallUp & deleteWall
-			top.tileOptions |= wallDown
-			top.tileOptions &= wallAll ^ (wallDown & (deleteWall ^ wallAll))
+			top.tileOptions |= wallDown | wallAuto
+			top.tileOptions &= wallAllAuto ^ (wallDown & (deleteWall ^ wallAll))
 		}
 	}
 	if tile.pos[1] < curMap.size[1]-1 {
 		bottem := &curMap.tMap[tile.pos[0]][tile.pos[1]+1]
 		if bottem.tileOptions&wallAllAuto != 0 {
 			tile.tileOptions |= wallDown & deleteWall
-			bottem.tileOptions |= wallUp
-			bottem.tileOptions &= wallAll ^ (wallUp & (deleteWall ^ wallAll))
+			bottem.tileOptions |= wallUp | wallAuto
+			bottem.tileOptions &= wallAllAuto ^ (wallUp & (deleteWall ^ wallAll))
 		}
 	}
 	if tile.pos[0] > 0 {
 		left := &curMap.tMap[tile.pos[0]-1][tile.pos[1]]
 		if left.tileOptions&wallAllAuto != 0 {
 			tile.tileOptions |= wallLeft & deleteWall
-			left.tileOptions |= wallRight
-			left.tileOptions &= wallAll ^ (wallRight & (deleteWall ^ wallAll))
+			left.tileOptions |= wallRight | wallAuto
+			left.tileOptions &= wallAllAuto ^ (wallRight & (deleteWall ^ wallAll))
 		}
 	}
 	if tile.pos[0] < curMap.size[0]-1 {
 		right := &curMap.tMap[tile.pos[0]+1][tile.pos[1]]
 		if right.tileOptions&wallAllAuto != 0 {
 			tile.tileOptions |= wallRight & deleteWall
-			right.tileOptions |= wallLeft
-			right.tileOptions &= wallAll ^ (wallLeft & (deleteWall ^ wallAll))
+			right.tileOptions |= wallLeft | wallAuto
+			right.tileOptions &= wallAllAuto ^ (wallLeft & (deleteWall ^ wallAll))
 		}
 	}
 }
