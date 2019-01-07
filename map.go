@@ -14,6 +14,18 @@ import (
 	"github.com/go-gl/mathgl/mgl32"
 )
 
+const (
+	wallUp      = 0x1
+	wallDown    = 0x2
+	wallLeft    = 0x4
+	wallRight   = 0x8
+	wallAll     = 0xF
+	wallAuto    = 0x10
+	wallAllAuto = 0x1F
+	dot         = 0x20
+	dotBig      = 0x40
+)
+
 // in the movement map each point is stored as binary where the first is up, the second is down
 // third is left and the forth is right
 // ex: 0110 is a point where you can move down and left
@@ -60,14 +72,13 @@ func (tile Tile) Render() {
 	modelUniform := gl.GetUniformLocation(tile.program, gl.Str("model\x00"))
 	gl.UniformMatrix4fv(modelUniform, 1, false, &model[0])
 
-	// fmt.Println("pos", tile.pos, "\ntextures", tile.textures)
 	tileOptionsUniform := gl.GetUniformLocation(tile.program, gl.Str("tileOptions\x00"))
 	gl.Uniform1i(tileOptionsUniform, tile.tileOptions)
 
 	var color mgl32.Vec4
-	if tile.tileOptions&0x1F != 0 {
+	if tile.tileOptions&wallAllAuto != 0 {
 		color = mgl32.Vec4{0, 0, 1, 1}
-	} else if tile.tileOptions&0x60 != 0 {
+	} else if tile.tileOptions&(dot|dotBig) != 0 {
 		color = mgl32.Vec4{1, 1, 0, 1}
 	}
 	// fmt.Println("color", color)
@@ -104,46 +115,46 @@ func newTile(pos [2]int, texture int32) Tile {
 
 func (curMap *Map) ChangeTileOptions(tile *Tile, tileOptions int32) {
 	tile.tileOptions = tileOptions
-	if tileOptions&0xF == 0 {
+	if tileOptions&wallAll == 0 {
 		curMap.updateNearbyWall(tile, tileOptions)
 	}
 }
 
 func (curMap *Map) updateNearbyWall(tile *Tile, tileOptions int32) {
 	deleteWall := int32(0)
-	if tileOptions&0x10 != 0 {
-		deleteWall = 0xF
+	if tileOptions&wallAuto != 0 {
+		deleteWall = wallAll
 	}
 	if tile.pos[1] > 0 {
 		top := &curMap.tMap[tile.pos[0]][tile.pos[1]-1]
-		if top.tileOptions&0x1F != 0 {
-			tile.tileOptions |= 0x1 & deleteWall
-			top.tileOptions |= 0x2
-			top.tileOptions &= 0xF ^ (0x2 & (deleteWall ^ 0xF))
+		if top.tileOptions&wallAllAuto != 0 {
+			tile.tileOptions |= wallUp & deleteWall
+			top.tileOptions |= wallDown
+			top.tileOptions &= wallAll ^ (wallDown & (deleteWall ^ wallAll))
 		}
 	}
 	if tile.pos[1] < curMap.size[1]-1 {
 		bottem := &curMap.tMap[tile.pos[0]][tile.pos[1]+1]
-		if bottem.tileOptions&0x1F != 0 {
-			tile.tileOptions |= 0x2 & deleteWall
-			bottem.tileOptions |= 0x1
-			bottem.tileOptions &= 0xF ^ (0x1 & (deleteWall ^ 0xF))
+		if bottem.tileOptions&wallAllAuto != 0 {
+			tile.tileOptions |= wallDown & deleteWall
+			bottem.tileOptions |= wallUp
+			bottem.tileOptions &= wallAll ^ (wallUp & (deleteWall ^ wallAll))
 		}
 	}
 	if tile.pos[0] > 0 {
 		left := &curMap.tMap[tile.pos[0]-1][tile.pos[1]]
-		if left.tileOptions&0x1F != 0 {
-			tile.tileOptions |= 0x4 & deleteWall
-			left.tileOptions |= 0x8
-			left.tileOptions &= 0xF ^ (0x8 & (deleteWall ^ 0xF))
+		if left.tileOptions&wallAllAuto != 0 {
+			tile.tileOptions |= wallLeft & deleteWall
+			left.tileOptions |= wallRight
+			left.tileOptions &= wallAll ^ (wallRight & (deleteWall ^ wallAll))
 		}
 	}
 	if tile.pos[0] < curMap.size[0]-1 {
 		right := &curMap.tMap[tile.pos[0]+1][tile.pos[1]]
-		if right.tileOptions&0x1F != 0 {
-			tile.tileOptions |= 0x8 & deleteWall
-			right.tileOptions |= 0x4
-			right.tileOptions &= 0xF ^ (0x4 & (deleteWall ^ 0xF))
+		if right.tileOptions&wallAllAuto != 0 {
+			tile.tileOptions |= wallRight & deleteWall
+			right.tileOptions |= wallLeft
+			right.tileOptions &= wallAll ^ (wallLeft & (deleteWall ^ wallAll))
 		}
 	}
 }
@@ -272,25 +283,25 @@ func initTileRendering(camera Camera) {
 
 func RegisterMapBindings(curMap *Map, tTile *Tile) {
 	RegisterKeyBinding(glfw.KeyW, "Toggle Up Wall Tile", func(w *glfw.Window, mods glfw.ModifierKey) {
-		tTile.tileOptions = (tTile.tileOptions ^ 0x1) & 0xF
+		tTile.tileOptions = (tTile.tileOptions ^ wallUp) & wallAll
 	})
 	RegisterKeyBinding(glfw.KeyS, "Toggle Down Wall Tile", func(w *glfw.Window, mods glfw.ModifierKey) {
-		tTile.tileOptions = (tTile.tileOptions ^ 0x2) & 0xF
+		tTile.tileOptions = (tTile.tileOptions ^ wallDown) & wallAll
 	})
 	RegisterKeyBinding(glfw.KeyA, "Toggle Left Wall Tile", func(w *glfw.Window, mods glfw.ModifierKey) {
-		tTile.tileOptions = (tTile.tileOptions ^ 0x4) & 0xF
+		tTile.tileOptions = (tTile.tileOptions ^ wallLeft) & wallAll
 	})
 	RegisterKeyBinding(glfw.KeyD, "Toggle Right Wall Tile", func(w *glfw.Window, mods glfw.ModifierKey) {
-		tTile.tileOptions = (tTile.tileOptions ^ 0x8) & 0xF
+		tTile.tileOptions = (tTile.tileOptions ^ wallRight) & wallAll
 	})
 	RegisterKeyBinding(glfw.KeyR, "Toggle Auto Wall Tile", func(w *glfw.Window, mods glfw.ModifierKey) {
-		tTile.tileOptions = (tTile.tileOptions ^ 0x10) & 0x10
+		tTile.tileOptions = (tTile.tileOptions ^ wallAuto) & wallAuto
 	})
 	RegisterKeyBinding(glfw.KeyE, "Toggle Dot Tile", func(w *glfw.Window, mods glfw.ModifierKey) {
-		tTile.tileOptions = (tTile.tileOptions ^ 0x20) & 0x20
+		tTile.tileOptions = (tTile.tileOptions ^ dot) & dot
 	})
 	RegisterKeyBinding(glfw.KeyQ, "Toggle Big Dot Tile", func(w *glfw.Window, mods glfw.ModifierKey) {
-		tTile.tileOptions = (tTile.tileOptions ^ 0x40) & 0x40
+		tTile.tileOptions = (tTile.tileOptions ^ dotBig) & dotBig
 	})
 	RegisterKeyBinding(glfw.KeyZ, "Clear Tile", func(w *glfw.Window, mods glfw.ModifierKey) {
 		tTile.tileOptions = 0x0
