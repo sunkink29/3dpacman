@@ -11,10 +11,13 @@ import (
 	"github.com/go-gl/gl/v4.1-core/gl"
 	"github.com/go-gl/glfw/v3.2/glfw"
 	"github.com/go-gl/mathgl/mgl32"
+
+	"github.com/sunkink29/3dpacman/input"
+	"github.com/sunkink29/3dpacman/maps"
+	"github.com/sunkink29/3dpacman/rendering"
+	"github.com/sunkink29/3dpacman/tile"
 )
 
-const windowWidth = 800
-const windowHeight = 600
 const speed = 5
 const frameRate float64 = 60
 
@@ -37,7 +40,7 @@ func main() {
 	glfw.WindowHint(glfw.OpenGLProfile, glfw.OpenGLCoreProfile)
 	glfw.WindowHint(glfw.OpenGLForwardCompatible, glfw.True)
 	glfw.WindowHint(glfw.Samples, 4)
-	window, err := glfw.CreateWindow(windowWidth, windowHeight, "Cube", nil, nil)
+	window, err := glfw.CreateWindow(rendering.WindowWidth, rendering.WindowHeight, "Cube", nil, nil)
 	if err != nil {
 		panic(err)
 	}
@@ -53,19 +56,20 @@ func main() {
 	version := gl.GoStr(gl.GetString(gl.VERSION))
 	fmt.Println("OpenGL version", version)
 
-	window.SetKeyCallback(OnKeyPress)
+	window.SetKeyCallback(input.OnKeyPress)
+	window.SetMouseButtonCallback(input.OnMouseButtonPress)
 
 	cameraPos := mgl32.Vec3{14, 0, 15.5}
 	// projectionMat := mgl32.Perspective(mgl32.DegToRad(45.0), float32(windowWidth)/windowHeight, 30.0, 50)
 	projectionMat := mgl32.Ortho(-50/2, 50/2, -50*.75/2, 50*.75/2, 30, 50)
 	viewMat := mgl32.LookAtV(cameraPos.Add(mgl32.Vec3{0, 40, 0}), cameraPos, mgl32.Vec3{0, 1, 0})
-	camera := Camera{&cameraPos, &projectionMat, &viewMat}
+	camera := rendering.Camera{&cameraPos, &projectionMat, &viewMat}
 
-	initTileRendering(camera)
+	tile.InitTileRendering(camera)
 
-	curMap := createEmptyMap(startMapSize)
+	curMap := maps.CreateEmptyMap(startMapSize)
 
-	testTile := newTile([2]int{-2, 0}, 0)
+	testTile := tile.NewTile([2]int{-2, 0}, 0)
 
 	// Configure global settings
 	gl.Enable(gl.DEPTH_TEST)
@@ -75,8 +79,7 @@ func main() {
 	// angle := 0.0
 	previousTime := time.Now()
 
-	setMouseButtonCallback(window, camera, &curMap, &testTile)
-	RegisterMapBindings(&curMap, &testTile)
+	maps.RegisterMapBindings(&curMap, &testTile, &camera)
 
 	for !window.ShouldClose() {
 		gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
@@ -89,12 +92,12 @@ func main() {
 		//angle += deltaTime
 		// model := mgl32.HomogRotate3D(float32(angle), mgl32.Vec3{0, 1, 0})
 
-		cameraPos = cameraPos.Add(moveCamera(window).Mul(speed).Mul(float32(deltaTime)))
+		cameraPos = cameraPos.Add(input.MoveCamera(window).Mul(speed).Mul(float32(deltaTime)))
 		viewMat = mgl32.LookAtV(cameraPos.Add(mgl32.Vec3{0, 40, 0.1}), cameraPos, mgl32.Vec3{0, 1, 0})
 
 		// Render
-
-		curMap.Render(viewMat)
+		tile.SetTileUniforms(viewMat)
+		curMap.Render()
 		testTile.Render()
 
 		// Maintenance

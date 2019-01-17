@@ -1,4 +1,4 @@
-package main
+package rendering
 
 import (
 	"fmt"
@@ -6,25 +6,32 @@ import (
 	"image/draw"
 	"os"
 	"strings"
+	"unsafe"
 
 	"github.com/go-gl/mathgl/mgl32"
 
 	"github.com/go-gl/gl/v4.1-core/gl"
+	"github.com/go-gl/glfw/v3.2/glfw"
 )
 
+const WindowWidth = 800
+const WindowHeight = 600
+
+var RenderWireframe int32
+
 type Camera struct {
-	cameraPos        *mgl32.Vec3
-	projectionMatrix *mgl32.Mat4
-	viewMatrix       *mgl32.Mat4
+	CameraPos        *mgl32.Vec3
+	ProjectionMatrix *mgl32.Mat4
+	ViewMatrix       *mgl32.Mat4
 }
 
-func newProgram(vertexShaderSource, fragmentShaderSource string) (uint32, error) {
-	vertexShader, err := compileShader(vertexShaderSource, gl.VERTEX_SHADER)
+func NewProgram(vertexShaderSource, fragmentShaderSource string) (uint32, error) {
+	vertexShader, err := CompileShader(vertexShaderSource, gl.VERTEX_SHADER)
 	if err != nil {
 		return 0, err
 	}
 
-	fragmentShader, err := compileShader(fragmentShaderSource, gl.FRAGMENT_SHADER)
+	fragmentShader, err := CompileShader(fragmentShaderSource, gl.FRAGMENT_SHADER)
 	if err != nil {
 		return 0, err
 	}
@@ -53,7 +60,7 @@ func newProgram(vertexShaderSource, fragmentShaderSource string) (uint32, error)
 	return program, nil
 }
 
-func compileShader(source string, shaderType uint32) (uint32, error) {
+func CompileShader(source string, shaderType uint32) (uint32, error) {
 	shader := gl.CreateShader(shaderType)
 
 	csources, free := gl.Strs(source)
@@ -76,7 +83,7 @@ func compileShader(source string, shaderType uint32) (uint32, error) {
 	return shader, nil
 }
 
-func newTexture(file string) (uint32, error) {
+func NewTexture(file string) (uint32, error) {
 	imgFile, err := os.Open(file)
 	if err != nil {
 		return 0, fmt.Errorf("texture %q not found on disk: %v", file, err)
@@ -115,7 +122,28 @@ func newTexture(file string) (uint32, error) {
 	return texture, nil
 }
 
-var vertexShader = `
+func ScreenToWorldSpace(window *glfw.Window, point [2]float64, matProjection mgl32.Mat4) mgl32.Vec3 {
+	depth := float32(0)
+	pointer := unsafe.Pointer(&depth)
+	gl.ReadPixels(int32(point[0]), WindowHeight-int32(point[1]), 1, 1, gl.DEPTH_COMPONENT, gl.FLOAT, pointer)
+	winZ := depth
+
+	var input [4]float32
+	input[0] = (2.0 * (float32(point[0]-0) / (WindowWidth - 0))) - 1.0
+	input[1] = 1.0 - (2.0 * (float32(point[1]-0) / (WindowHeight - 0)))
+	input[2] = 2.0*winZ - 1.0
+	input[3] = 1
+
+	inputV := mgl32.Vec4{input[0], input[1], input[2], input[3]}
+	pos := matProjection.Mul4x1(inputV)
+	pos[3] = 1.0 / pos[3]
+	pos[0] *= pos[3]
+	pos[1] *= pos[3]
+	pos[2] *= pos[3]
+	return pos.Vec3()
+}
+
+var VertexShader = `
 #version 400
 uniform mat4 projection;
 uniform mat4 camera;
@@ -129,7 +157,7 @@ void main() {
 }
 ` + "\x00"
 
-var tileFragShader = `
+var TileFragShader = `
 #version 400
 uniform sampler2D tex[7];
 uniform int tileOptions;
