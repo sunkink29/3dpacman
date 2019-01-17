@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/go-gl/glfw/v3.2/glfw"
+	"github.com/go-gl/mathgl/mgl32"
 	"github.com/scorpheus/dialog"
 
 	"github.com/sunkink29/3dpacman/input"
@@ -98,7 +99,7 @@ func (curMap *Map) updateNearbyWall(tile *tile.Tile, tileOptions int32) {
 	}
 }
 
-func (curMap Map) getSaveableMap() string {
+func (curMap *Map) getSaveableMap() string {
 	var mapString string
 
 	mapString += fmt.Sprintf("%0*X%0*X", 2, curMap.size[0], 2, curMap.size[1])
@@ -115,7 +116,7 @@ func (curMap Map) getSaveableMap() string {
 	return mapString
 }
 
-func (curMap Map) SaveToFile(filename string) error {
+func (curMap *Map) SaveToFile(filename string) error {
 	curMapString := curMap.getSaveableMap()
 	if !strings.HasSuffix(filename, ".pmap") {
 		filename += ".pmap"
@@ -167,65 +168,142 @@ func LoadMapFromFile(filename string) (*Map, error) {
 	return LoadMapFromString(mapString), nil
 }
 
+// stores the camera movement. each movement is stored as 4 bits: up, down, left right
+var movement uint8 = 0x0
+
+func UpdateCameraPosition(camera *rendering.Camera, speed float32, deltaTime float64) {
+	camMovement := mgl32.Vec3{0, 0, 0}
+	// Move up
+	if movement&1 != 0 {
+		camMovement = camMovement.Add(mgl32.Vec3{0, 0, 1})
+	}
+	// Move down
+	if movement&2 != 0 {
+		camMovement = camMovement.Add(mgl32.Vec3{0, 0, -1})
+	}
+	// Move right
+	if movement&(1<<2) != 0 {
+		camMovement = camMovement.Add(mgl32.Vec3{1, 0, 0})
+	}
+	// Move left
+	if movement&(2<<2) != 0 {
+		camMovement = camMovement.Add(mgl32.Vec3{-1, 0, 0})
+	}
+	*camera.CameraPos = camera.CameraPos.Add(camMovement.Mul(speed).Mul(float32(deltaTime)))
+}
+
 func RegisterMapBindings(curMap *Map, tTile *tile.Tile, camera *rendering.Camera) {
-	input.RegisterKeyBinding(glfw.KeyW, "Toggle Up Wall Tile", func(w *glfw.Window, mods glfw.ModifierKey) {
-		tTile.TileOptions = (tTile.TileOptions ^ WallUp) & WallAll
-	})
-	input.RegisterKeyBinding(glfw.KeyS, "Toggle Down Wall Tile", func(w *glfw.Window, mods glfw.ModifierKey) {
-		tTile.TileOptions = (tTile.TileOptions ^ WallDown) & WallAll
-	})
-	input.RegisterKeyBinding(glfw.KeyA, "Toggle Left Wall Tile", func(w *glfw.Window, mods glfw.ModifierKey) {
-		tTile.TileOptions = (tTile.TileOptions ^ WallLeft) & WallAll
-	})
-	input.RegisterKeyBinding(glfw.KeyD, "Toggle Right Wall Tile", func(w *glfw.Window, mods glfw.ModifierKey) {
-		tTile.TileOptions = (tTile.TileOptions ^ WallRight) & WallAll
-	})
-	input.RegisterKeyBinding(glfw.KeyR, "Toggle Auto Wall Tile", func(w *glfw.Window, mods glfw.ModifierKey) {
-		tTile.TileOptions = (tTile.TileOptions ^ WallAuto) & WallAuto
-	})
-	input.RegisterKeyBinding(glfw.KeyE, "Toggle Dot Tile", func(w *glfw.Window, mods glfw.ModifierKey) {
-		tTile.TileOptions = (tTile.TileOptions ^ Dot) & Dot
-	})
-	input.RegisterKeyBinding(glfw.KeyQ, "Toggle Big Dot Tile", func(w *glfw.Window, mods glfw.ModifierKey) {
-		tTile.TileOptions = (tTile.TileOptions ^ DotBig) & DotBig
-	})
-	input.RegisterKeyBinding(glfw.KeyZ, "Clear Tile", func(w *glfw.Window, mods glfw.ModifierKey) {
-		tTile.TileOptions = 0x0
-	})
-	input.RegisterKeyBinding(glfw.KeyX, "Toggle WireFrame", func(w *glfw.Window, mods glfw.ModifierKey) {
-		rendering.RenderWireframe ^= 1
-	})
-	input.RegisterKeyBinding(glfw.KeyC, "Load Map", func(w *glfw.Window, mods glfw.ModifierKey) {
-		filename, err := dialog.File().Filter("*.pmap", "pmap").Load()
-		if err != nil {
-			fmt.Println("Error getting map filename:", err)
-			return
-		}
-		newMap, err := LoadMapFromFile(filename)
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-		*curMap = *newMap
-	})
-	input.RegisterKeyBinding(glfw.KeyV, "Save Map", func(w *glfw.Window, mods glfw.ModifierKey) {
-		filename, err := dialog.File().Filter("*.pmap", "pmap").Title("Save Map").Save()
-		if err != nil {
-			fmt.Println("Error getting map filename:", err)
-			return
-		}
-		err = curMap.SaveToFile(filename)
-		if err != nil {
-			fmt.Println(err)
+	input.RegisterKeyBinding(glfw.KeyUp, "Move Camera Up", func(w *glfw.Window, action glfw.Action, mods glfw.ModifierKey) {
+		if action == glfw.Press {
+			movement |= 2
+		} else if action == glfw.Release {
+			movement &= 2 ^ 0xFF
 		}
 	})
-	input.RegisterKeyBinding(glfw.KeyF, "Load Test Map", func(w *glfw.Window, mods glfw.ModifierKey) {
-		newMap, err := LoadMapFromFile("assets/maps/smallTestMap.pmap")
-		if err != nil {
-			fmt.Println(err)
-			return
+	input.RegisterKeyBinding(glfw.KeyDown, "Move Camera Down", func(w *glfw.Window, action glfw.Action, mods glfw.ModifierKey) {
+		if action == glfw.Press {
+			movement |= 1
+		} else if action == glfw.Release {
+			movement &= 1 ^ 0xFF
 		}
-		*curMap = *newMap
+	})
+	input.RegisterKeyBinding(glfw.KeyLeft, "Move Camera Left", func(w *glfw.Window, action glfw.Action, mods glfw.ModifierKey) {
+		if action == glfw.Press {
+			movement |= 2 << 2
+		} else if action == glfw.Release {
+			movement &= (2 << 2) ^ 0xFF
+		}
+	})
+	input.RegisterKeyBinding(glfw.KeyRight, "Move Camera right", func(w *glfw.Window, action glfw.Action, mods glfw.ModifierKey) {
+		if action == glfw.Press {
+			movement |= 1 << 2
+		} else if action == glfw.Release {
+			movement &= (1 << 2) ^ 0xFF
+		}
+	})
+	input.RegisterKeyBinding(glfw.KeyW, "Toggle Up Wall Tile", func(w *glfw.Window, action glfw.Action, mods glfw.ModifierKey) {
+		if action == glfw.Release {
+			tTile.TileOptions = (tTile.TileOptions ^ WallUp) & WallAll
+		}
+	})
+	input.RegisterKeyBinding(glfw.KeyS, "Toggle Down Wall Tile", func(w *glfw.Window, action glfw.Action, mods glfw.ModifierKey) {
+		if action == glfw.Release {
+			tTile.TileOptions = (tTile.TileOptions ^ WallDown) & WallAll
+		}
+	})
+	input.RegisterKeyBinding(glfw.KeyA, "Toggle Left Wall Tile", func(w *glfw.Window, action glfw.Action, mods glfw.ModifierKey) {
+		if action == glfw.Release {
+			tTile.TileOptions = (tTile.TileOptions ^ WallLeft) & WallAll
+		}
+	})
+	input.RegisterKeyBinding(glfw.KeyD, "Toggle Right Wall Tile", func(w *glfw.Window, action glfw.Action, mods glfw.ModifierKey) {
+		if action == glfw.Release {
+			tTile.TileOptions = (tTile.TileOptions ^ WallRight) & WallAll
+		}
+	})
+	input.RegisterKeyBinding(glfw.KeyR, "Toggle Auto Wall Tile", func(w *glfw.Window, action glfw.Action, mods glfw.ModifierKey) {
+		if action == glfw.Release {
+			tTile.TileOptions = (tTile.TileOptions ^ WallAuto) & WallAuto
+		}
+	})
+	input.RegisterKeyBinding(glfw.KeyE, "Toggle Dot Tile", func(w *glfw.Window, action glfw.Action, mods glfw.ModifierKey) {
+		if action == glfw.Release {
+			tTile.TileOptions = (tTile.TileOptions ^ Dot) & Dot
+		}
+	})
+	input.RegisterKeyBinding(glfw.KeyQ, "Toggle Big Dot Tile", func(w *glfw.Window, action glfw.Action, mods glfw.ModifierKey) {
+		if action == glfw.Release {
+			tTile.TileOptions = (tTile.TileOptions ^ DotBig) & DotBig
+		}
+	})
+	input.RegisterKeyBinding(glfw.KeyZ, "Clear Tile", func(w *glfw.Window, action glfw.Action, mods glfw.ModifierKey) {
+		if action == glfw.Release {
+			tTile.TileOptions = 0x0
+		}
+	})
+	input.RegisterKeyBinding(glfw.KeyX, "Toggle WireFrame", func(w *glfw.Window, action glfw.Action, mods glfw.ModifierKey) {
+		if action == glfw.Release {
+			rendering.RenderWireframe ^= 1
+		}
+
+	})
+	input.RegisterKeyBinding(glfw.KeyC, "Load Map", func(w *glfw.Window, action glfw.Action, mods glfw.ModifierKey) {
+		if action == glfw.Release {
+			filename, err := dialog.File().Filter("*.pmap", "pmap").Load()
+			if err != nil {
+				fmt.Println("Error getting map filename:", err)
+				return
+			}
+			newMap, err := LoadMapFromFile(filename)
+			if err != nil {
+				fmt.Println(err)
+				return
+			}
+			*curMap = *newMap
+		}
+	})
+	input.RegisterKeyBinding(glfw.KeyV, "Save Map", func(w *glfw.Window, action glfw.Action, mods glfw.ModifierKey) {
+		if action == glfw.Release {
+			filename, err := dialog.File().Filter("*.pmap", "pmap").Title("Save Map").Save()
+			if err != nil {
+				fmt.Println("Error getting map filename:", err)
+				return
+			}
+			err = curMap.SaveToFile(filename)
+			if err != nil {
+				fmt.Println(err)
+			}
+		}
+	})
+	input.RegisterKeyBinding(glfw.KeyF, "Load Test Map", func(w *glfw.Window, action glfw.Action, mods glfw.ModifierKey) {
+		if action == glfw.Release {
+			newMap, err := LoadMapFromFile("assets/maps/smallTestMap.pmap")
+			if err != nil {
+				fmt.Println(err)
+				return
+			}
+			*curMap = *newMap
+		}
 	})
 	input.RegisterMouseButtonBinding("map editor click", func(w *glfw.Window, button glfw.MouseButton, mod glfw.ModifierKey) {
 		mouseX, mouseY := w.GetCursorPos()

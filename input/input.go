@@ -30,10 +30,10 @@ func OnMouseButtonPress(w *glfw.Window, button glfw.MouseButton, action glfw.Act
 	}
 }
 
-type KeyCallback func(w *glfw.Window, mods glfw.ModifierKey)
+type KeyCallback func(w *glfw.Window, action glfw.Action, mods glfw.ModifierKey)
 type keyBinding struct {
 	name     string
-	callback func(w *glfw.Window, mods glfw.ModifierKey)
+	callback KeyCallback
 }
 
 var registeredKeyBinding map[glfw.Key]keyBinding
@@ -49,8 +49,8 @@ func RegisterKeyBinding(key glfw.Key, name string, callback KeyCallback) {
 
 func OnKeyPress(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
 	binding, ok := registeredKeyBinding[key]
-	if ok && action == glfw.Release {
-		binding.callback(w, mods)
+	if ok {
+		binding.callback(w, action, mods)
 	}
 }
 

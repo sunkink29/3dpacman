@@ -91,8 +91,9 @@ func main() {
 
 		//angle += deltaTime
 		// model := mgl32.HomogRotate3D(float32(angle), mgl32.Vec3{0, 1, 0})
+		maps.UpdateCameraPosition(&camera, speed, deltaTime)
 
-		cameraPos = cameraPos.Add(input.MoveCamera(window).Mul(speed).Mul(float32(deltaTime)))
+		// cameraPos = cameraPos.Add(input.MoveCamera(window).Mul(speed).Mul(float32(deltaTime)))
 		viewMat = mgl32.LookAtV(cameraPos.Add(mgl32.Vec3{0, 40, 0.1}), cameraPos, mgl32.Vec3{0, 1, 0})
 
 		// Render
