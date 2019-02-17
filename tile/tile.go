@@ -12,13 +12,14 @@ import (
 
 // Tile holds the vao and program pointers
 type Tile struct {
-	Pos         [2]int
+	Pos         [2]float32
+	layer       int
 	TileOptions int32
 }
 
-func NewTile(pos [2]int, texture int32) Tile {
+func NewTile(pos [2]int, layer int, texture int32) Tile {
 
-	return Tile{pos, texture}
+	return Tile{[2]float32{float32(pos[0]), float32(pos[1])}, layer, texture}
 }
 
 var tVao, tProgram uint32
@@ -95,7 +96,7 @@ func SetTileUniforms(viewMatrix mgl32.Mat4) {
 }
 
 func (tile Tile) Render() {
-	model := mgl32.Translate3D(float32(tile.Pos[0]), 0, float32(tile.Pos[1]))
+	model := mgl32.Translate3D(tile.Pos[0], float32(tile.layer), tile.Pos[1])
 	modelUniform := gl.GetUniformLocation(tProgram, gl.Str("model\x00"))
 	gl.UniformMatrix4fv(modelUniform, 1, false, &model[0])
 
@@ -106,6 +107,8 @@ func (tile Tile) Render() {
 	if tile.TileOptions&WallAllAuto != 0 {
 		color = mgl32.Vec4{0, 0, 1, 1}
 	} else if tile.TileOptions&(Dot|DotBig) != 0 {
+		color = mgl32.Vec4{1, 1, 0, 1}
+	} else if tile.TileOptions&PlayerTex != 0 {
 		color = mgl32.Vec4{1, 1, 0, 1}
 	}
 	// fmt.Println("color", color)

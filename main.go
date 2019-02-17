@@ -14,6 +14,7 @@ import (
 
 	"github.com/sunkink29/3dpacman/input"
 	"github.com/sunkink29/3dpacman/maps"
+	"github.com/sunkink29/3dpacman/player"
 	"github.com/sunkink29/3dpacman/rendering"
 	"github.com/sunkink29/3dpacman/tile"
 )
@@ -69,7 +70,9 @@ func main() {
 
 	curMap := maps.CreateEmptyMap(startMapSize)
 
-	testTile := tile.NewTile([2]int{-2, 0}, 0)
+	testTile := tile.NewTile([2]int{-2, 0}, 0, 0)
+
+	curPlayer := player.New([2]int{2, 2})
 
 	// Configure global settings
 	gl.Enable(gl.DEPTH_TEST)
@@ -80,6 +83,10 @@ func main() {
 	previousTime := time.Now()
 
 	maps.RegisterMapBindings(&curMap, &testTile, &camera)
+	player.RegisterPlayerBindings()
+	input.RegisterKeyBinding(glfw.KeyEscape, "quit", func(w *glfw.Window, action glfw.Action, mods glfw.ModifierKey) {
+		w.SetShouldClose(true)
+	})
 
 	for !window.ShouldClose() {
 		gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
@@ -91,15 +98,16 @@ func main() {
 
 		//angle += deltaTime
 		// model := mgl32.HomogRotate3D(float32(angle), mgl32.Vec3{0, 1, 0})
-		maps.UpdateCameraPosition(&camera, speed, deltaTime)
 
-		// cameraPos = cameraPos.Add(input.MoveCamera(window).Mul(speed).Mul(float32(deltaTime)))
+		maps.UpdateCameraPosition(&camera, speed, deltaTime)
 		viewMat = mgl32.LookAtV(cameraPos.Add(mgl32.Vec3{0, 40, 0.1}), cameraPos, mgl32.Vec3{0, 1, 0})
+		curPlayer.UpdatePlayerPos(&curMap)
 
 		// Render
 		tile.SetTileUniforms(viewMat)
 		curMap.Render()
 		testTile.Render()
+		curPlayer.Render(deltaTime)
 
 		// Maintenance
 		window.SwapBuffers()

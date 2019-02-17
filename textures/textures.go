@@ -10,9 +10,10 @@ const (
 	WallAllAuto = 0x1F
 	Dot         = 0x20
 	DotBig      = 0x40
+	PlayerTex   = 0x80
 )
 
 const TextureDir = "assets/textures/"
 
-var TextureFilenames = []string{"wallUp", "wallDown", "wallLeft", "wallRight", "wallAuto", "dot", "bigDot"}
+var TextureFilenames = []string{"wallUp", "wallDown", "wallLeft", "wallRight", "wallAuto", "dot", "bigDot", "pacman"}
 

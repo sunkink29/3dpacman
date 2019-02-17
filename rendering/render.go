@@ -159,7 +159,7 @@ void main() {
 
 var TileFragShader = `
 #version 400
-uniform sampler2D tex[7];
+uniform sampler2D tex[10];
 uniform int tileOptions;
 uniform vec4 inputColor;
 uniform int renderWireframe;

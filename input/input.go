@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/go-gl/glfw/v3.2/glfw"
-	"github.com/go-gl/mathgl/mgl32"
 )
 
 func init() {
@@ -52,25 +51,4 @@ func OnKeyPress(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, 
 	if ok {
 		binding.callback(w, action, mods)
 	}
-}
-
-func MoveCamera(window *glfw.Window) mgl32.Vec3 {
-	movement := mgl32.Vec3{0, 0, 0}
-	// Move forward
-	if window.GetKey(glfw.KeyUp) == glfw.Press {
-		movement = movement.Add(mgl32.Vec3{0, 0, 1})
-	}
-	// Move backward
-	if window.GetKey(glfw.KeyDown) == glfw.Press {
-		movement = movement.Add(mgl32.Vec3{0, 0, -1})
-	}
-	// Move right
-	if window.GetKey(glfw.KeyRight) == glfw.Press {
-		movement = movement.Add(mgl32.Vec3{1, 0, 0})
-	}
-	// Move left
-	if window.GetKey(glfw.KeyLeft) == glfw.Press {
-		movement = movement.Add(mgl32.Vec3{-1, 0, 0})
-	}
-	return movement
 }

@@ -14,7 +14,7 @@ import (
 
 	"github.com/sunkink29/3dpacman/input"
 	"github.com/sunkink29/3dpacman/rendering"
-	. "github.com/sunkink29/3dpacman/textures"
+	"github.com/sunkink29/3dpacman/textures"
 	"github.com/sunkink29/3dpacman/tile"
 )
 
@@ -43,7 +43,7 @@ func CreateEmptyMap(size [2]int) Map {
 	for colIndex := range tiles {
 		col := make([]tile.Tile, size[1])
 		for rowIndex := range col {
-			col[rowIndex] = tile.NewTile([2]int{colIndex, rowIndex}, 0)
+			col[rowIndex] = tile.NewTile([2]int{colIndex, rowIndex}, 0, 0)
 			toggle = !toggle
 		}
 		tiles[colIndex] = col
@@ -53,48 +53,56 @@ func CreateEmptyMap(size [2]int) Map {
 	return Map{size, tiles, mMap}
 }
 
-func (curMap *Map) ChangeTileOptions(tile *tile.Tile, tileOptions int32) {
+func (curMap *Map) GetMapTile(pos [2]int) int32 {
+	return curMap.tMap[pos[0]][pos[1]].TileOptions
+}
+
+func (curMap *Map) ChangeMapTile(tile *tile.Tile, tileOptions int32) {
 	tile.TileOptions = tileOptions
-	if tileOptions&WallAll == 0 {
+	if tileOptions&textures.WallAll == 0 {
 		curMap.updateNearbyWall(tile, tileOptions)
 	}
 }
 
+func (curMap *Map) GetSize() [2]int {
+	return curMap.size
+}
+
 func (curMap *Map) updateNearbyWall(tile *tile.Tile, tileOptions int32) {
 	deleteWall := int32(0)
-	if tileOptions&WallAuto != 0 {
-		deleteWall = WallAllAuto
+	if tileOptions&textures.WallAuto != 0 {
+		deleteWall = textures.WallAllAuto
 	}
 	if tile.Pos[1] > 0 {
-		top := &curMap.tMap[tile.Pos[0]][tile.Pos[1]-1]
-		if top.TileOptions&WallAllAuto != 0 {
-			tile.TileOptions |= WallUp & deleteWall
-			top.TileOptions |= WallDown | WallAuto
-			top.TileOptions &= WallAllAuto ^ (WallDown & (deleteWall ^ WallAll))
+		top := &curMap.tMap[int(tile.Pos[0])][int(tile.Pos[1])-1]
+		if top.TileOptions&textures.WallAllAuto != 0 {
+			tile.TileOptions |= textures.WallUp & deleteWall
+			top.TileOptions |= textures.WallDown | textures.WallAuto
+			top.TileOptions &= textures.WallAllAuto ^ (textures.WallDown & (deleteWall ^ textures.WallAll))
 		}
 	}
-	if tile.Pos[1] < curMap.size[1]-1 {
-		bottem := &curMap.tMap[tile.Pos[0]][tile.Pos[1]+1]
-		if bottem.TileOptions&WallAllAuto != 0 {
-			tile.TileOptions |= WallDown & deleteWall
-			bottem.TileOptions |= WallUp | WallAuto
-			bottem.TileOptions &= WallAllAuto ^ (WallUp & (deleteWall ^ WallAll))
+	if int(tile.Pos[1]) < curMap.size[1]-1 {
+		bottem := &curMap.tMap[int(tile.Pos[0])][int(tile.Pos[1])+1]
+		if bottem.TileOptions&textures.WallAllAuto != 0 {
+			tile.TileOptions |= textures.WallDown & deleteWall
+			bottem.TileOptions |= textures.WallUp | textures.WallAuto
+			bottem.TileOptions &= textures.WallAllAuto ^ (textures.WallUp & (deleteWall ^ textures.WallAll))
 		}
 	}
 	if tile.Pos[0] > 0 {
-		left := &curMap.tMap[tile.Pos[0]-1][tile.Pos[1]]
-		if left.TileOptions&WallAllAuto != 0 {
-			tile.TileOptions |= WallLeft & deleteWall
-			left.TileOptions |= WallRight | WallAuto
-			left.TileOptions &= WallAllAuto ^ (WallRight & (deleteWall ^ WallAll))
+		left := &curMap.tMap[int(tile.Pos[0])-1][int(tile.Pos[1])]
+		if left.TileOptions&textures.WallAllAuto != 0 {
+			tile.TileOptions |= textures.WallLeft & deleteWall
+			left.TileOptions |= textures.WallRight | textures.WallAuto
+			left.TileOptions &= textures.WallAllAuto ^ (textures.WallRight & (deleteWall ^ textures.WallAll))
 		}
 	}
-	if tile.Pos[0] < curMap.size[0]-1 {
-		right := &curMap.tMap[tile.Pos[0]+1][tile.Pos[1]]
-		if right.TileOptions&WallAllAuto != 0 {
-			tile.TileOptions |= WallRight & deleteWall
-			right.TileOptions |= WallLeft | WallAuto
-			right.TileOptions &= WallAllAuto ^ (WallLeft & (deleteWall ^ WallAll))
+	if int(tile.Pos[0]) < curMap.size[0]-1 {
+		right := &curMap.tMap[int(tile.Pos[0])+1][int(tile.Pos[1])]
+		if right.TileOptions&textures.WallAllAuto != 0 {
+			tile.TileOptions |= textures.WallRight & deleteWall
+			right.TileOptions |= textures.WallLeft | textures.WallAuto
+			right.TileOptions &= textures.WallAllAuto ^ (textures.WallLeft & (deleteWall ^ textures.WallAll))
 		}
 	}
 }
@@ -193,28 +201,28 @@ func UpdateCameraPosition(camera *rendering.Camera, speed float32, deltaTime flo
 }
 
 func RegisterMapBindings(curMap *Map, tTile *tile.Tile, camera *rendering.Camera) {
-	input.RegisterKeyBinding(glfw.KeyUp, "Move Camera Up", func(w *glfw.Window, action glfw.Action, mods glfw.ModifierKey) {
+	input.RegisterKeyBinding(glfw.KeyI, "Move Camera Up", func(w *glfw.Window, action glfw.Action, mods glfw.ModifierKey) {
 		if action == glfw.Press {
 			movement |= 2
 		} else if action == glfw.Release {
 			movement &= 2 ^ 0xFF
 		}
 	})
-	input.RegisterKeyBinding(glfw.KeyDown, "Move Camera Down", func(w *glfw.Window, action glfw.Action, mods glfw.ModifierKey) {
+	input.RegisterKeyBinding(glfw.KeyK, "Move Camera Down", func(w *glfw.Window, action glfw.Action, mods glfw.ModifierKey) {
 		if action == glfw.Press {
 			movement |= 1
 		} else if action == glfw.Release {
 			movement &= 1 ^ 0xFF
 		}
 	})
-	input.RegisterKeyBinding(glfw.KeyLeft, "Move Camera Left", func(w *glfw.Window, action glfw.Action, mods glfw.ModifierKey) {
+	input.RegisterKeyBinding(glfw.KeyJ, "Move Camera Left", func(w *glfw.Window, action glfw.Action, mods glfw.ModifierKey) {
 		if action == glfw.Press {
 			movement |= 2 << 2
 		} else if action == glfw.Release {
 			movement &= (2 << 2) ^ 0xFF
 		}
 	})
-	input.RegisterKeyBinding(glfw.KeyRight, "Move Camera right", func(w *glfw.Window, action glfw.Action, mods glfw.ModifierKey) {
+	input.RegisterKeyBinding(glfw.KeyL, "Move Camera right", func(w *glfw.Window, action glfw.Action, mods glfw.ModifierKey) {
 		if action == glfw.Press {
 			movement |= 1 << 2
 		} else if action == glfw.Release {
@@ -223,37 +231,37 @@ func RegisterMapBindings(curMap *Map, tTile *tile.Tile, camera *rendering.Camera
 	})
 	input.RegisterKeyBinding(glfw.KeyW, "Toggle Up Wall Tile", func(w *glfw.Window, action glfw.Action, mods glfw.ModifierKey) {
 		if action == glfw.Release {
-			tTile.TileOptions = (tTile.TileOptions ^ WallUp) & WallAll
+			tTile.TileOptions = (tTile.TileOptions ^ textures.WallUp) & textures.WallAll
 		}
 	})
 	input.RegisterKeyBinding(glfw.KeyS, "Toggle Down Wall Tile", func(w *glfw.Window, action glfw.Action, mods glfw.ModifierKey) {
 		if action == glfw.Release {
-			tTile.TileOptions = (tTile.TileOptions ^ WallDown) & WallAll
+			tTile.TileOptions = (tTile.TileOptions ^ textures.WallDown) & textures.WallAll
 		}
 	})
 	input.RegisterKeyBinding(glfw.KeyA, "Toggle Left Wall Tile", func(w *glfw.Window, action glfw.Action, mods glfw.ModifierKey) {
 		if action == glfw.Release {
-			tTile.TileOptions = (tTile.TileOptions ^ WallLeft) & WallAll
+			tTile.TileOptions = (tTile.TileOptions ^ textures.WallLeft) & textures.WallAll
 		}
 	})
 	input.RegisterKeyBinding(glfw.KeyD, "Toggle Right Wall Tile", func(w *glfw.Window, action glfw.Action, mods glfw.ModifierKey) {
 		if action == glfw.Release {
-			tTile.TileOptions = (tTile.TileOptions ^ WallRight) & WallAll
+			tTile.TileOptions = (tTile.TileOptions ^ textures.WallRight) & textures.WallAll
 		}
 	})
 	input.RegisterKeyBinding(glfw.KeyR, "Toggle Auto Wall Tile", func(w *glfw.Window, action glfw.Action, mods glfw.ModifierKey) {
 		if action == glfw.Release {
-			tTile.TileOptions = (tTile.TileOptions ^ WallAuto) & WallAuto
+			tTile.TileOptions = (tTile.TileOptions ^ textures.WallAuto) & textures.WallAuto
 		}
 	})
 	input.RegisterKeyBinding(glfw.KeyE, "Toggle Dot Tile", func(w *glfw.Window, action glfw.Action, mods glfw.ModifierKey) {
 		if action == glfw.Release {
-			tTile.TileOptions = (tTile.TileOptions ^ Dot) & Dot
+			tTile.TileOptions = (tTile.TileOptions ^ textures.Dot) & textures.Dot
 		}
 	})
 	input.RegisterKeyBinding(glfw.KeyQ, "Toggle Big Dot Tile", func(w *glfw.Window, action glfw.Action, mods glfw.ModifierKey) {
 		if action == glfw.Release {
-			tTile.TileOptions = (tTile.TileOptions ^ DotBig) & DotBig
+			tTile.TileOptions = (tTile.TileOptions ^ textures.DotBig) & textures.DotBig
 		}
 	})
 	input.RegisterKeyBinding(glfw.KeyZ, "Clear Tile", func(w *glfw.Window, action glfw.Action, mods glfw.ModifierKey) {
@@ -318,7 +326,7 @@ func RegisterMapBindings(curMap *Map, tTile *tile.Tile, camera *rendering.Camera
 			} else if button == glfw.MouseButton2 {
 				tileChange = 0x0 //tile.TileOptions & (tTile.TileOptions ^ 0xFF)
 			}
-			curMap.ChangeTileOptions(tile, tileChange)
+			curMap.ChangeMapTile(tile, tileChange)
 		}
 	})
 }
