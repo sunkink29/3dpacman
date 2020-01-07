@@ -10,7 +10,7 @@ import (
 
 	"github.com/go-gl/glfw/v3.2/glfw"
 	"github.com/go-gl/mathgl/mgl32"
-	"github.com/scorpheus/dialog"
+	"github.com/sqweek/dialog"
 
 	"github.com/sunkink29/3dpacman/input"
 	"github.com/sunkink29/3dpacman/rendering"
