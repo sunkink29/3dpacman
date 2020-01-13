@@ -77,6 +77,7 @@ func CompileShader(source string, shaderType uint32) (uint32, error) {
 		log := strings.Repeat("\x00", int(logLength+1))
 		gl.GetShaderInfoLog(shader, logLength, nil, gl.Str(log))
 
+		println(log)
 		return 0, fmt.Errorf("failed to compile %v: %v", source, log)
 	}
 
@@ -160,7 +161,8 @@ void main() {
 var TileFragShader = `
 #version 400
 uniform sampler2D tex[10];
-uniform int tileOptions;
+uniform uint texIndex;
+uniform uint renderFlags;
 uniform vec4 inputColor;
 uniform int renderWireframe;
 uniform float borderWidth;
@@ -170,8 +172,9 @@ out vec4 outputColor;
 
 void renderTexture() {
 	outputColor = vec4(0, 0, 0, 1);
+	outputColor += texture(tex[texIndex], fragTexCoord) * float(texIndex > 0); 
 	for (int i = 0; i < tex.length(); i++) {
-		int useTex = min(tileOptions & (1 << i), 1);
+		int useTex = int(renderFlags) & (1 << i) * int(texIndex == 4);
 		outputColor += texture(tex[i], fragTexCoord) * useTex;
 	}
 

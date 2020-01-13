@@ -1,5 +1,10 @@
 package textures
 
+const TextureDir = "assets/textures/"
+
+var TextureFilenames = []string{"wallUp", "wallDown", "wallLeft", "wallRight", "wallAuto", "dot", "bigDot", "pacman"}
+
+/*
 const (
 	WallUp      = 0x1
 	WallDown    = 0x2
@@ -12,8 +17,4 @@ const (
 	DotBig      = 0x40
 	PlayerTex   = 0x80
 )
-
-const TextureDir = "assets/textures/"
-
-var TextureFilenames = []string{"wallUp", "wallDown", "wallLeft", "wallRight", "wallAuto", "dot", "bigDot", "pacman"}
-
+*/

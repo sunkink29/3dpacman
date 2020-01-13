@@ -10,16 +10,54 @@ import (
 	. "github.com/sunkink29/3dpacman/textures"
 )
 
-// Tile holds the vao and program pointers
-type Tile struct {
-	Pos         [2]float32
-	layer       int
-	TileOptions int32
+type TileType uint16
+
+const (
+	Blank TileType = iota
+	Wall
+	Dot
+	DotBig
+	PlayerTex
+	PlayerSpawn
+)
+
+type TypeData struct {
+	color    mgl32.Vec4
+	texIndex uint32
 }
 
-func NewTile(pos [2]int, layer int, texture int32) Tile {
+var typeDataList = []TypeData{
+	TypeData{mgl32.Vec4{0, 0, 0, 0}, 0},       // Blank
+	TypeData{mgl32.Vec4{0, 0, 1, 1}, 4},       // Wall
+	TypeData{mgl32.Vec4{1, 1, 0, 1}, 5},       // Dot
+	TypeData{mgl32.Vec4{1, 1, 0, 1}, 6},       // DotBig
+	TypeData{mgl32.Vec4{1, 1, 0, 1}, 7},       // playerTex
+	TypeData{mgl32.Vec4{0.8, 0.8, 0.8, 1}, 6}, // playerSpawn
+}
 
-	return Tile{[2]float32{float32(pos[0]), float32(pos[1])}, layer, texture}
+type TileFlag uint16
+
+const (
+	Up TileFlag = 1 << iota
+	Down
+	Left
+	Right
+	All = 0xF
+)
+
+// Tile holds the vao and program pointers
+type Tile struct {
+	Pos   [2]float32
+	layer int
+	Type  TileType
+	Flags TileFlag
+	// when type is wall the first four bits are wall directions otherwise
+	//   the first four bits represent the directions next to the current tile that are not of type wall
+}
+
+func NewTile(pos [2]int, layer int, ttype TileType, flags TileFlag) Tile {
+
+	return Tile{[2]float32{float32(pos[0]), float32(pos[1])}, layer, ttype, flags}
 }
 
 var tVao, tProgram uint32
@@ -100,24 +138,24 @@ func (tile Tile) Render() {
 	modelUniform := gl.GetUniformLocation(tProgram, gl.Str("model\x00"))
 	gl.UniformMatrix4fv(modelUniform, 1, false, &model[0])
 
-	tileOptionsUniform := gl.GetUniformLocation(tProgram, gl.Str("tileOptions\x00"))
-	gl.Uniform1i(tileOptionsUniform, tile.TileOptions)
+	texIndexUniform := gl.GetUniformLocation(tProgram, gl.Str("texIndex\x00"))
+	gl.Uniform1ui(texIndexUniform, typeDataList[tile.Type].texIndex)
 
-	var color mgl32.Vec4
-	if tile.TileOptions&WallAllAuto != 0 {
-		color = mgl32.Vec4{0, 0, 1, 1}
-	} else if tile.TileOptions&(Dot|DotBig) != 0 {
-		color = mgl32.Vec4{1, 1, 0, 1}
-	} else if tile.TileOptions&PlayerTex != 0 {
-		color = mgl32.Vec4{1, 1, 0, 1}
+	renderFlagsUniform := gl.GetUniformLocation(tProgram, gl.Str("renderFlags\x00"))
+	if tile.Type != Wall {
+		tile.Flags &= All ^ 0xFFFF
 	}
-	// fmt.Println("color", color)
+	gl.Uniform1ui(renderFlagsUniform, uint32(tile.Flags))
 
 	colorUniform := gl.GetUniformLocation(tProgram, gl.Str("inputColor\x00"))
-	gl.Uniform4fv(colorUniform, 1, &color[0])
+	gl.Uniform4fv(colorUniform, 1, &typeDataList[tile.Type].color[0])
 
 	gl.BindVertexArray(tVao)
 	gl.DrawArrays(gl.TRIANGLES, 0, 2*3)
+}
+
+func GetTypeDataList() []TypeData {
+	return typeDataList
 }
 
 var planeVertices = []float32{
@@ -129,4 +167,3 @@ var planeVertices = []float32{
 	-0.5, 0.5, 0.5, 0.0, 1.0,
 	0.5, 0.5, 0.5, 1.0, 1.0,
 }
-

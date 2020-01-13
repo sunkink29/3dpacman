@@ -70,7 +70,9 @@ func main() {
 
 	curMap := maps.CreateEmptyMap(startMapSize)
 
-	testTile := tile.NewTile([2]int{-2, 0}, 0, 0)
+	// move the managment of floating tiles to the map package
+
+	testTile := tile.NewTile([2]int{-2, 0}, 0, 0, 0)
 
 	curPlayer := player.New([2]int{2, 2})
 

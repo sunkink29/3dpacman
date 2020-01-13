@@ -1,11 +1,11 @@
 package maps
 
 import (
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io/ioutil"
 	"math"
-	"strconv"
 	"strings"
 
 	"github.com/go-gl/glfw/v3.2/glfw"
@@ -14,7 +14,6 @@ import (
 
 	"github.com/sunkink29/3dpacman/input"
 	"github.com/sunkink29/3dpacman/rendering"
-	"github.com/sunkink29/3dpacman/textures"
 	"github.com/sunkink29/3dpacman/tile"
 )
 
@@ -22,8 +21,8 @@ import (
 // third is left and the forth is right
 // ex: 0110 is a point where you can move down and left
 type Map struct {
-	size [2]int
-	tMap [][]tile.Tile // tile map: array that holds the tile vao and program
+	size [2]int32
+	tMap [][]tile.Tile // tile map: array that holds the tile position and texture options
 	mMap [][]int       // movement map: array that holds what directions the player can go at any point
 }
 
@@ -43,137 +42,131 @@ func CreateEmptyMap(size [2]int) Map {
 	for colIndex := range tiles {
 		col := make([]tile.Tile, size[1])
 		for rowIndex := range col {
-			col[rowIndex] = tile.NewTile([2]int{colIndex, rowIndex}, 0, 0)
+			col[rowIndex] = tile.NewTile([2]int{colIndex, rowIndex}, 0, 0, 0)
 			toggle = !toggle
 		}
 		tiles[colIndex] = col
 		mMap[colIndex] = make([]int, size[1])
 	}
 
-	return Map{size, tiles, mMap}
+	size32 := [2]int32{int32(size[0]), int32(size[1])}
+	return Map{size32, tiles, mMap}
 }
 
-func (curMap *Map) GetMapTile(pos [2]int) int32 {
-	return curMap.tMap[pos[0]][pos[1]].TileOptions
+func (curMap *Map) GetMapTile(pos [2]int) tile.Tile {
+	return curMap.tMap[pos[0]][pos[1]]
 }
 
-func (curMap *Map) ChangeMapTile(tile *tile.Tile, tileOptions int32) {
-	tile.TileOptions = tileOptions
-	if tileOptions&textures.WallAll == 0 {
-		curMap.updateNearbyWall(tile, tileOptions)
+func (curMap *Map) ChangeMapTile(cTile *tile.Tile, tileType tile.TileType, flags tile.TileFlag) {
+	cTile.Type = tileType
+	cTile.Flags = flags
+	if cTile.Type == tile.Wall && cTile.Flags&tile.All == 0 || cTile.Type != tile.Wall {
+		curMap.updateNearbyWall(cTile)
 	}
 }
 
 func (curMap *Map) GetSize() [2]int {
-	return curMap.size
+	return [2]int{int(curMap.size[0]), int(curMap.size[1])}
 }
 
-func (curMap *Map) updateNearbyWall(tile *tile.Tile, tileOptions int32) {
-	deleteWall := int32(0)
-	if tileOptions&textures.WallAuto != 0 {
-		deleteWall = textures.WallAllAuto
+func (curMap *Map) updateNearbyWall(cTile *tile.Tile) {
+	deleteWall := tile.TileFlag(0)
+	if cTile.Type == tile.Wall && cTile.Flags&tile.All == 0 {
+		deleteWall = tile.All
 	}
-	if tile.Pos[1] > 0 {
-		top := &curMap.tMap[int(tile.Pos[0])][int(tile.Pos[1])-1]
-		if top.TileOptions&textures.WallAllAuto != 0 {
-			tile.TileOptions |= textures.WallUp & deleteWall
-			top.TileOptions |= textures.WallDown | textures.WallAuto
-			top.TileOptions &= textures.WallAllAuto ^ (textures.WallDown & (deleteWall ^ textures.WallAll))
+	if cTile.Pos[1] > 0 {
+		top := &curMap.tMap[int(cTile.Pos[0])][int(cTile.Pos[1])-1]
+		if top.Type == tile.Wall {
+			cTile.Flags |= tile.Up & deleteWall
+			top.Flags |= tile.Down
+			top.Flags &= tile.All ^ (tile.Down & (deleteWall ^ tile.All))
 		}
 	}
-	if int(tile.Pos[1]) < curMap.size[1]-1 {
-		bottem := &curMap.tMap[int(tile.Pos[0])][int(tile.Pos[1])+1]
-		if bottem.TileOptions&textures.WallAllAuto != 0 {
-			tile.TileOptions |= textures.WallDown & deleteWall
-			bottem.TileOptions |= textures.WallUp | textures.WallAuto
-			bottem.TileOptions &= textures.WallAllAuto ^ (textures.WallUp & (deleteWall ^ textures.WallAll))
+	if int32(cTile.Pos[1]) < curMap.size[1]-1 {
+		bottem := &curMap.tMap[int(cTile.Pos[0])][int(cTile.Pos[1])+1]
+		if bottem.Type == tile.Wall {
+			cTile.Flags |= tile.Down & deleteWall
+			bottem.Flags |= tile.Up
+			bottem.Flags &= tile.All ^ (tile.Up & (deleteWall ^ tile.All))
 		}
 	}
-	if tile.Pos[0] > 0 {
-		left := &curMap.tMap[int(tile.Pos[0])-1][int(tile.Pos[1])]
-		if left.TileOptions&textures.WallAllAuto != 0 {
-			tile.TileOptions |= textures.WallLeft & deleteWall
-			left.TileOptions |= textures.WallRight | textures.WallAuto
-			left.TileOptions &= textures.WallAllAuto ^ (textures.WallRight & (deleteWall ^ textures.WallAll))
+	if cTile.Pos[0] > 0 {
+		left := &curMap.tMap[int(cTile.Pos[0])-1][int(cTile.Pos[1])]
+		if left.Type == tile.Wall {
+			cTile.Flags |= tile.Left & deleteWall
+			left.Flags |= tile.Right
+			left.Flags &= tile.All ^ (tile.Right & (deleteWall ^ tile.All))
 		}
 	}
-	if int(tile.Pos[0]) < curMap.size[0]-1 {
-		right := &curMap.tMap[int(tile.Pos[0])+1][int(tile.Pos[1])]
-		if right.TileOptions&textures.WallAllAuto != 0 {
-			tile.TileOptions |= textures.WallRight & deleteWall
-			right.TileOptions |= textures.WallLeft | textures.WallAuto
-			right.TileOptions &= textures.WallAllAuto ^ (textures.WallLeft & (deleteWall ^ textures.WallAll))
+	if int32(cTile.Pos[0]) < curMap.size[0]-1 {
+		right := &curMap.tMap[int(cTile.Pos[0])+1][int(cTile.Pos[1])]
+		if right.Type == tile.Wall {
+			cTile.Flags |= tile.Right & deleteWall
+			right.Flags |= tile.Left
+			right.Flags &= tile.All ^ (tile.Left & (deleteWall ^ tile.All))
 		}
 	}
-}
-
-func (curMap *Map) getSaveableMap() string {
-	var mapString string
-
-	mapString += fmt.Sprintf("%0*X%0*X", 2, curMap.size[0], 2, curMap.size[1])
-	for _, col := range curMap.tMap {
-		for _, tile := range col {
-			mapString += fmt.Sprintf("%0*X", 2, tile.TileOptions)
-		}
-	}
-	for _, col := range curMap.mMap {
-		for _, move := range col {
-			mapString += fmt.Sprintf("%0*X", 2, move)
-		}
-	}
-	return mapString
 }
 
 func (curMap *Map) SaveToFile(filename string) error {
-	curMapString := curMap.getSaveableMap()
-	if !strings.HasSuffix(filename, ".pmap") {
-		filename += ".pmap"
+	if !strings.HasSuffix(filename, ".tmap") {
+		filename += ".tmap"
 	}
-	err := ioutil.WriteFile(filename, []byte(curMapString), 0644)
-	if err != nil {
+
+	data := []byte("tmap")
+	bs := make([]byte, 4)
+	binary.LittleEndian.PutUint32(bs, uint32(curMap.size[0]))
+	data = append(data, bs...)
+
+	binary.LittleEndian.PutUint32(bs, uint32(curMap.size[1]))
+	data = append(data, bs...)
+
+	for _, col := range curMap.tMap {
+		for _, cTile := range col {
+			bs := make([]byte, 2)
+			binary.LittleEndian.PutUint16(bs, uint16(cTile.Type))
+			data = append(data, bs...)
+
+			binary.LittleEndian.PutUint16(bs, uint16(cTile.Flags))
+			data = append(data, bs...)
+		}
+	}
+	if err := ioutil.WriteFile(filename, data, 0644); err != nil {
 		return errors.New(fmt.Sprint("Error Saving Map to file:", err))
 	}
 	return nil
 }
 
-func LoadMapFromString(stringMap string) *Map {
-	sliceMap := strings.Split(stringMap, "")
-	mapWidth64, _ := strconv.ParseInt(strings.Join(sliceMap[0:2], ""), 16, 64)
-	mapHeight64, _ := strconv.ParseInt(strings.Join(sliceMap[2:4], ""), 16, 64)
-	mapWidth := int(mapWidth64)
-	mapHeight := int(mapHeight64)
-	if len(sliceMap) == mapWidth*mapHeight*4+4 {
-		newMap := CreateEmptyMap([2]int{mapWidth, mapHeight})
-		for i, col := range newMap.tMap {
-			for j := range col {
-				curStrIndex := (i*mapHeight+j)*2 + 4
-				tileOptions, _ := strconv.ParseInt(strings.Join(sliceMap[curStrIndex:curStrIndex+2], ""), 16, 32)
-				newMap.tMap[i][j].TileOptions = int32(tileOptions)
-			}
-		}
-		for i, col := range newMap.tMap {
-			for j := range col {
-				curStrIndex := mapWidth*mapHeight*2 + (i*mapHeight+j)*2 + 4
-				movement, _ := strconv.ParseInt(strings.Join(sliceMap[curStrIndex:curStrIndex+1], ""), 16, 0)
-				newMap.mMap[i][j] = int(movement)
-			}
-		}
-
-		return &newMap
-	} else {
-		fmt.Println("Error loading map: given map size and given map data do not match")
-		return nil
-	}
-}
-
 func LoadMapFromFile(filename string) (*Map, error) {
+	const SIZEOF_INT32 = 4
+	const SIZEOF_INT16 = 2
+	const SIZEOF_TYPESTRING = len("tmap")
+
 	mapBytes, err := ioutil.ReadFile(filename)
 	if err != nil {
 		return nil, errors.New(fmt.Sprint("Error Reading Map:", err))
 	}
-	mapString := string(mapBytes)
+	println(len(mapBytes))
+	mapBytes = mapBytes[SIZEOF_TYPESTRING:]
 
-	return LoadMapFromString(mapString), nil
+	var mapSize [2]int
+	mapSize[0] = int(binary.LittleEndian.Uint32(mapBytes[0:SIZEOF_INT32]))
+	mapSize[1] = int(binary.LittleEndian.Uint32(mapBytes[SIZEOF_INT32 : SIZEOF_INT32*2]))
+
+	mapBytes = mapBytes[SIZEOF_INT32*2:]
+
+	if len(mapBytes) == mapSize[0]*mapSize[1]*SIZEOF_INT32 {
+		newMap := CreateEmptyMap(mapSize)
+		for i, col := range newMap.tMap {
+			for j := range col {
+				curIndex := (i*mapSize[1] + j)
+				newMap.tMap[i][j].Type = tile.TileType(binary.LittleEndian.Uint16(mapBytes[curIndex*SIZEOF_INT32 : curIndex*SIZEOF_INT32+SIZEOF_INT16]))
+				newMap.tMap[i][j].Flags = tile.TileFlag(binary.LittleEndian.Uint16(mapBytes[curIndex*SIZEOF_INT32+SIZEOF_INT16 : (curIndex+1)*SIZEOF_INT32]))
+			}
+		}
+		return &newMap, nil
+	}
+	return nil, errors.New("Error loading map: given map size and given map data do not match")
 }
 
 // stores the camera movement. each movement is stored as 4 bits: up, down, left right
@@ -231,42 +224,85 @@ func RegisterMapBindings(curMap *Map, tTile *tile.Tile, camera *rendering.Camera
 	})
 	input.RegisterKeyBinding(glfw.KeyW, "Toggle Up Wall Tile", func(w *glfw.Window, action glfw.Action, mods glfw.ModifierKey) {
 		if action == glfw.Release {
-			tTile.TileOptions = (tTile.TileOptions ^ textures.WallUp) & textures.WallAll
+			tTile.Type = tile.Wall
+			tTile.Flags ^= tile.Up
+			if tTile.Flags&tile.All == 0 {
+				tTile.Type = tile.Blank
+			}
 		}
 	})
 	input.RegisterKeyBinding(glfw.KeyS, "Toggle Down Wall Tile", func(w *glfw.Window, action glfw.Action, mods glfw.ModifierKey) {
 		if action == glfw.Release {
-			tTile.TileOptions = (tTile.TileOptions ^ textures.WallDown) & textures.WallAll
+			tTile.Type = tile.Wall
+			tTile.Flags ^= tile.Down
+			if tTile.Flags&tile.All == 0 {
+				tTile.Type = tile.Blank
+			}
 		}
 	})
 	input.RegisterKeyBinding(glfw.KeyA, "Toggle Left Wall Tile", func(w *glfw.Window, action glfw.Action, mods glfw.ModifierKey) {
 		if action == glfw.Release {
-			tTile.TileOptions = (tTile.TileOptions ^ textures.WallLeft) & textures.WallAll
+			tTile.Type = tile.Wall
+			tTile.Flags ^= tile.Left
+			if tTile.Flags&tile.All == 0 {
+				tTile.Type = tile.Blank
+			}
 		}
 	})
 	input.RegisterKeyBinding(glfw.KeyD, "Toggle Right Wall Tile", func(w *glfw.Window, action glfw.Action, mods glfw.ModifierKey) {
 		if action == glfw.Release {
-			tTile.TileOptions = (tTile.TileOptions ^ textures.WallRight) & textures.WallAll
+			tTile.Type = tile.Wall
+			tTile.Flags ^= tile.Right
+			if tTile.Flags&tile.All == 0 {
+				tTile.Type = tile.Blank
+			}
 		}
 	})
 	input.RegisterKeyBinding(glfw.KeyR, "Toggle Auto Wall Tile", func(w *glfw.Window, action glfw.Action, mods glfw.ModifierKey) {
 		if action == glfw.Release {
-			tTile.TileOptions = (tTile.TileOptions ^ textures.WallAuto) & textures.WallAuto
+			if tTile.Type != tile.Wall {
+				tTile.Type = tile.Wall
+			} else {
+				if tTile.Flags&tile.All != 0 {
+					tTile.Flags &= 0xFFF0
+				} else {
+					tTile.Type = tile.Blank
+				}
+			}
 		}
 	})
 	input.RegisterKeyBinding(glfw.KeyE, "Toggle Dot Tile", func(w *glfw.Window, action glfw.Action, mods glfw.ModifierKey) {
 		if action == glfw.Release {
-			tTile.TileOptions = (tTile.TileOptions ^ textures.Dot) & textures.Dot
+			if tTile.Type != tile.Dot {
+				tTile.Type = tile.Dot
+			} else {
+				tTile.Type = tile.Blank
+			}
+
 		}
 	})
 	input.RegisterKeyBinding(glfw.KeyQ, "Toggle Big Dot Tile", func(w *glfw.Window, action glfw.Action, mods glfw.ModifierKey) {
 		if action == glfw.Release {
-			tTile.TileOptions = (tTile.TileOptions ^ textures.DotBig) & textures.DotBig
+			if tTile.Type != tile.DotBig {
+				tTile.Type = tile.DotBig
+			} else {
+				tTile.Type = tile.Blank
+			}
+		}
+	})
+	input.RegisterKeyBinding(glfw.KeyT, "Toggle Player Spawn Tile", func(w *glfw.Window, action glfw.Action, mods glfw.ModifierKey) {
+		if action == glfw.Release {
+			if tTile.Type != tile.PlayerSpawn {
+				tTile.Type = tile.PlayerSpawn
+			} else {
+				tTile.Type = tile.Blank
+			}
 		}
 	})
 	input.RegisterKeyBinding(glfw.KeyZ, "Clear Tile", func(w *glfw.Window, action glfw.Action, mods glfw.ModifierKey) {
 		if action == glfw.Release {
-			tTile.TileOptions = 0x0
+			tTile.Type = tile.Blank
+			tTile.Flags = 0x0
 		}
 	})
 	input.RegisterKeyBinding(glfw.KeyX, "Toggle WireFrame", func(w *glfw.Window, action glfw.Action, mods glfw.ModifierKey) {
@@ -277,7 +313,7 @@ func RegisterMapBindings(curMap *Map, tTile *tile.Tile, camera *rendering.Camera
 	})
 	input.RegisterKeyBinding(glfw.KeyC, "Load Map", func(w *glfw.Window, action glfw.Action, mods glfw.ModifierKey) {
 		if action == glfw.Release {
-			filename, err := dialog.File().Filter("*.pmap", "pmap").Load()
+			filename, err := dialog.File().Filter("*.tmap", "tmap").Load()
 			if err != nil {
 				fmt.Println("Error getting map filename:", err)
 				return
@@ -292,7 +328,7 @@ func RegisterMapBindings(curMap *Map, tTile *tile.Tile, camera *rendering.Camera
 	})
 	input.RegisterKeyBinding(glfw.KeyV, "Save Map", func(w *glfw.Window, action glfw.Action, mods glfw.ModifierKey) {
 		if action == glfw.Release {
-			filename, err := dialog.File().Filter("*.pmap", "pmap").Title("Save Map").Save()
+			filename, err := dialog.File().Filter("*.tmap", "tmap").Title("Save Map").Save()
 			if err != nil {
 				fmt.Println("Error getting map filename:", err)
 				return
@@ -305,7 +341,7 @@ func RegisterMapBindings(curMap *Map, tTile *tile.Tile, camera *rendering.Camera
 	})
 	input.RegisterKeyBinding(glfw.KeyF, "Load Test Map", func(w *glfw.Window, action glfw.Action, mods glfw.ModifierKey) {
 		if action == glfw.Release {
-			newMap, err := LoadMapFromFile("assets/maps/smallTestMap.pmap")
+			newMap, err := LoadMapFromFile("assets/maps/smallTestMap.tmap")
 			if err != nil {
 				fmt.Println(err)
 				return
@@ -318,16 +354,14 @@ func RegisterMapBindings(curMap *Map, tTile *tile.Tile, camera *rendering.Camera
 		matProjection := camera.ProjectionMatrix.Mul4(*camera.ViewMatrix).Inv()
 		worldPointf := rendering.ScreenToWorldSpace(w, [2]float64{mouseX, mouseY}, matProjection)
 		worldPoint := []int{int(math.Floor(float64(worldPointf[0] + 0.5))), int(math.Floor(float64(worldPointf[2] + 0.5)))}
-		if worldPoint[0] >= 0 && worldPoint[1] >= 0 && worldPoint[0] < curMap.size[0] && worldPoint[1] < curMap.size[1] {
-			tile := &curMap.tMap[worldPoint[0]][worldPoint[1]]
-			tileChange := int32(0)
-			if button == glfw.MouseButton1 {
-				tileChange = tTile.TileOptions
-			} else if button == glfw.MouseButton2 {
-				tileChange = 0x0 //tile.TileOptions & (tTile.TileOptions ^ 0xFF)
+		if worldPoint[0] >= 0 && worldPoint[1] >= 0 && worldPoint[0] < int(curMap.size[0]) && worldPoint[1] < int(curMap.size[1]) {
+			cTile := &curMap.tMap[worldPoint[0]][worldPoint[1]]
+			tileChange := *tTile
+			if button == glfw.MouseButton2 {
+				tileChange.Type = tile.Blank
+				tileChange.Flags = 0x0
 			}
-			curMap.ChangeMapTile(tile, tileChange)
+			curMap.ChangeMapTile(cTile, tileChange.Type, tileChange.Flags)
 		}
 	})
 }
-
