@@ -32,7 +32,7 @@ var typeDataList = []TypeData{
 	TypeData{mgl32.Vec4{1, 1, 0, 1}, 5},       // Dot
 	TypeData{mgl32.Vec4{1, 1, 0, 1}, 6},       // DotBig
 	TypeData{mgl32.Vec4{1, 1, 0, 1}, 7},       // playerTex
-	TypeData{mgl32.Vec4{0.8, 0.8, 0.8, 1}, 6}, // playerSpawn
+	TypeData{mgl32.Vec4{0.1, 0.1, 0.1, 1}, 6}, // playerSpawn
 }
 
 type TileFlag uint16

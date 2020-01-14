@@ -9,10 +9,10 @@ import (
 	"strings"
 
 	"github.com/go-gl/glfw/v3.2/glfw"
-	"github.com/go-gl/mathgl/mgl32"
 	"github.com/sqweek/dialog"
 
 	"github.com/sunkink29/3dpacman/input"
+	"github.com/sunkink29/3dpacman/player"
 	"github.com/sunkink29/3dpacman/rendering"
 	"github.com/sunkink29/3dpacman/tile"
 )
@@ -21,17 +21,18 @@ import (
 // third is left and the forth is right
 // ex: 0110 is a point where you can move down and left
 type Map struct {
-	size [2]int32
-	tMap [][]tile.Tile // tile map: array that holds the tile position and texture options
-	mMap [][]int       // movement map: array that holds what directions the player can go at any point
+	size      [2]int32
+	tMap      [][]tile.Tile // tile map: array that holds the tile position and texture options
+	playerObj player.Player
 }
 
-func (curMap Map) Render() {
+func (curMap *Map) Render(deltaTime float64) {
 	for _, col := range curMap.tMap {
 		for _, row := range col {
 			row.Render()
 		}
 	}
+	curMap.playerObj.Render(deltaTime)
 }
 
 func CreateEmptyMap(size [2]int) Map {
@@ -50,11 +51,15 @@ func CreateEmptyMap(size [2]int) Map {
 	}
 
 	size32 := [2]int32{int32(size[0]), int32(size[1])}
-	return Map{size32, tiles, mMap}
+	return Map{size32, tiles, player.New([2]int{2, 1})}
 }
 
 func (curMap *Map) GetMapTile(pos [2]int) tile.Tile {
 	return curMap.tMap[pos[0]][pos[1]]
+}
+
+func (curMap *Map) GetSize() [2]int {
+	return [2]int{int(curMap.size[0]), int(curMap.size[1])}
 }
 
 func (curMap *Map) ChangeMapTile(cTile *tile.Tile, tileType tile.TileType, flags tile.TileFlag) {
@@ -65,8 +70,15 @@ func (curMap *Map) ChangeMapTile(cTile *tile.Tile, tileType tile.TileType, flags
 	}
 }
 
-func (curMap *Map) GetSize() [2]int {
-	return [2]int{int(curMap.size[0]), int(curMap.size[1])}
+func (curMap *Map) GetPlayerSpawn() [2]int {
+	for i, col := range curMap.tMap {
+		for j, curTile := range col {
+			if curTile.Type == tile.PlayerSpawn {
+				return [2]int{i, j}
+			}
+		}
+	}
+	return [2]int{2, 2}
 }
 
 func (curMap *Map) updateNearbyWall(cTile *tile.Tile) {
@@ -146,7 +158,6 @@ func LoadMapFromFile(filename string) (*Map, error) {
 	if err != nil {
 		return nil, errors.New(fmt.Sprint("Error Reading Map:", err))
 	}
-	println(len(mapBytes))
 	mapBytes = mapBytes[SIZEOF_TYPESTRING:]
 
 	var mapSize [2]int
@@ -164,64 +175,17 @@ func LoadMapFromFile(filename string) (*Map, error) {
 				newMap.tMap[i][j].Flags = tile.TileFlag(binary.LittleEndian.Uint16(mapBytes[curIndex*SIZEOF_INT32+SIZEOF_INT16 : (curIndex+1)*SIZEOF_INT32]))
 			}
 		}
+		newMap.playerObj.SetPos(newMap.GetPlayerSpawn())
 		return &newMap, nil
 	}
 	return nil, errors.New("Error loading map: given map size and given map data do not match")
 }
 
-// stores the camera movement. each movement is stored as 4 bits: up, down, left right
-var movement uint8 = 0x0
-
-func UpdateCameraPosition(camera *rendering.Camera, speed float32, deltaTime float64) {
-	camMovement := mgl32.Vec3{0, 0, 0}
-	// Move up
-	if movement&1 != 0 {
-		camMovement = camMovement.Add(mgl32.Vec3{0, 0, 1})
-	}
-	// Move down
-	if movement&2 != 0 {
-		camMovement = camMovement.Add(mgl32.Vec3{0, 0, -1})
-	}
-	// Move right
-	if movement&(1<<2) != 0 {
-		camMovement = camMovement.Add(mgl32.Vec3{1, 0, 0})
-	}
-	// Move left
-	if movement&(2<<2) != 0 {
-		camMovement = camMovement.Add(mgl32.Vec3{-1, 0, 0})
-	}
-	*camera.CameraPos = camera.CameraPos.Add(camMovement.Mul(speed).Mul(float32(deltaTime)))
+func (curMap *Map) Update() {
+	curMap.playerObj.UpdatePlayerPos(curMap.GetSize(), func(pos [2]int) tile.TileType { return curMap.GetMapTile(pos).Type })
 }
 
 func RegisterMapBindings(curMap *Map, tTile *tile.Tile, camera *rendering.Camera) {
-	input.RegisterKeyBinding(glfw.KeyI, "Move Camera Up", func(w *glfw.Window, action glfw.Action, mods glfw.ModifierKey) {
-		if action == glfw.Press {
-			movement |= 2
-		} else if action == glfw.Release {
-			movement &= 2 ^ 0xFF
-		}
-	})
-	input.RegisterKeyBinding(glfw.KeyK, "Move Camera Down", func(w *glfw.Window, action glfw.Action, mods glfw.ModifierKey) {
-		if action == glfw.Press {
-			movement |= 1
-		} else if action == glfw.Release {
-			movement &= 1 ^ 0xFF
-		}
-	})
-	input.RegisterKeyBinding(glfw.KeyJ, "Move Camera Left", func(w *glfw.Window, action glfw.Action, mods glfw.ModifierKey) {
-		if action == glfw.Press {
-			movement |= 2 << 2
-		} else if action == glfw.Release {
-			movement &= (2 << 2) ^ 0xFF
-		}
-	})
-	input.RegisterKeyBinding(glfw.KeyL, "Move Camera right", func(w *glfw.Window, action glfw.Action, mods glfw.ModifierKey) {
-		if action == glfw.Press {
-			movement |= 1 << 2
-		} else if action == glfw.Release {
-			movement &= (1 << 2) ^ 0xFF
-		}
-	})
 	input.RegisterKeyBinding(glfw.KeyW, "Toggle Up Wall Tile", func(w *glfw.Window, action glfw.Action, mods glfw.ModifierKey) {
 		if action == glfw.Release {
 			tTile.Type = tile.Wall

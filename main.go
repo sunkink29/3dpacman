@@ -74,8 +74,6 @@ func main() {
 
 	testTile := tile.NewTile([2]int{-2, 0}, 0, 0, 0)
 
-	curPlayer := player.New([2]int{2, 2})
-
 	// Configure global settings
 	gl.Enable(gl.DEPTH_TEST)
 	gl.DepthFunc(gl.LESS)
@@ -84,6 +82,7 @@ func main() {
 	// angle := 0.0
 	previousTime := time.Now()
 
+	rendering.RegisterMapBindings(&camera)
 	maps.RegisterMapBindings(&curMap, &testTile, &camera)
 	player.RegisterPlayerBindings()
 	input.RegisterKeyBinding(glfw.KeyEscape, "quit", func(w *glfw.Window, action glfw.Action, mods glfw.ModifierKey) {
@@ -101,15 +100,14 @@ func main() {
 		//angle += deltaTime
 		// model := mgl32.HomogRotate3D(float32(angle), mgl32.Vec3{0, 1, 0})
 
-		maps.UpdateCameraPosition(&camera, speed, deltaTime)
+		rendering.UpdateCameraPosition(&camera, speed, deltaTime)
 		viewMat = mgl32.LookAtV(cameraPos.Add(mgl32.Vec3{0, 40, 0.1}), cameraPos, mgl32.Vec3{0, 1, 0})
-		curPlayer.UpdatePlayerPos(&curMap)
+		curMap.Update()
 
 		// Render
 		tile.SetTileUniforms(viewMat)
-		curMap.Render()
 		testTile.Render()
-		curPlayer.Render(deltaTime)
+		curMap.Render(deltaTime)
 
 		// Maintenance
 		window.SwapBuffers()

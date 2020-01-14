@@ -12,6 +12,7 @@ import (
 
 	"github.com/go-gl/gl/v4.1-core/gl"
 	"github.com/go-gl/glfw/v3.2/glfw"
+	"github.com/sunkink29/3dpacman/input"
 )
 
 const WindowWidth = 800
@@ -23,6 +24,61 @@ type Camera struct {
 	CameraPos        *mgl32.Vec3
 	ProjectionMatrix *mgl32.Mat4
 	ViewMatrix       *mgl32.Mat4
+}
+
+// stores the camera movement. each movement is stored as 4 bits: up, down, left right
+var movement uint8 = 0x0
+
+func UpdateCameraPosition(camera *Camera, speed float32, deltaTime float64) {
+	camMovement := mgl32.Vec3{0, 0, 0}
+	// Move up
+	if movement&1 != 0 {
+		camMovement = camMovement.Add(mgl32.Vec3{0, 0, 1})
+	}
+	// Move down
+	if movement&2 != 0 {
+		camMovement = camMovement.Add(mgl32.Vec3{0, 0, -1})
+	}
+	// Move right
+	if movement&(1<<2) != 0 {
+		camMovement = camMovement.Add(mgl32.Vec3{1, 0, 0})
+	}
+	// Move left
+	if movement&(2<<2) != 0 {
+		camMovement = camMovement.Add(mgl32.Vec3{-1, 0, 0})
+	}
+	*camera.CameraPos = camera.CameraPos.Add(camMovement.Mul(speed).Mul(float32(deltaTime)))
+}
+
+func RegisterMapBindings(camera *Camera) {
+	input.RegisterKeyBinding(glfw.KeyI, "Move Camera Up", func(w *glfw.Window, action glfw.Action, mods glfw.ModifierKey) {
+		if action == glfw.Press {
+			movement |= 2
+		} else if action == glfw.Release {
+			movement &= 2 ^ 0xFF
+		}
+	})
+	input.RegisterKeyBinding(glfw.KeyK, "Move Camera Down", func(w *glfw.Window, action glfw.Action, mods glfw.ModifierKey) {
+		if action == glfw.Press {
+			movement |= 1
+		} else if action == glfw.Release {
+			movement &= 1 ^ 0xFF
+		}
+	})
+	input.RegisterKeyBinding(glfw.KeyJ, "Move Camera Left", func(w *glfw.Window, action glfw.Action, mods glfw.ModifierKey) {
+		if action == glfw.Press {
+			movement |= 2 << 2
+		} else if action == glfw.Release {
+			movement &= (2 << 2) ^ 0xFF
+		}
+	})
+	input.RegisterKeyBinding(glfw.KeyL, "Move Camera right", func(w *glfw.Window, action glfw.Action, mods glfw.ModifierKey) {
+		if action == glfw.Press {
+			movement |= 1 << 2
+		} else if action == glfw.Release {
+			movement &= (1 << 2) ^ 0xFF
+		}
+	})
 }
 
 func NewProgram(vertexShaderSource, fragmentShaderSource string) (uint32, error) {
