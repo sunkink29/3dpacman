@@ -134,7 +134,7 @@ func SetTileUniforms(viewMatrix mgl32.Mat4) {
 }
 
 func (tile Tile) Render() {
-	model := mgl32.Translate3D(tile.Pos[0], float32(tile.layer), tile.Pos[1])
+	model := mgl32.Translate3D(tile.Pos[0], float32(tile.layer-3), tile.Pos[1])
 	modelUniform := gl.GetUniformLocation(tProgram, gl.Str("model\x00"))
 	gl.UniformMatrix4fv(modelUniform, 1, false, &model[0])
 

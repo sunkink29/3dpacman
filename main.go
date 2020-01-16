@@ -6,6 +6,7 @@ import (
 	_ "image/png"
 	"log"
 	"runtime"
+	"strconv"
 	"time"
 
 	"github.com/go-gl/gl/v4.1-core/gl"
@@ -16,6 +17,7 @@ import (
 	"github.com/sunkink29/3dpacman/maps"
 	"github.com/sunkink29/3dpacman/player"
 	"github.com/sunkink29/3dpacman/rendering"
+	"github.com/sunkink29/3dpacman/rendering/text"
 	"github.com/sunkink29/3dpacman/tile"
 )
 
@@ -41,7 +43,7 @@ func main() {
 	glfw.WindowHint(glfw.OpenGLProfile, glfw.OpenGLCoreProfile)
 	glfw.WindowHint(glfw.OpenGLForwardCompatible, glfw.True)
 	glfw.WindowHint(glfw.Samples, 4)
-	window, err := glfw.CreateWindow(rendering.WindowWidth, rendering.WindowHeight, "Cube", nil, nil)
+	window, err := glfw.CreateWindow(rendering.WindowWidth, rendering.WindowHeight, "PacMan", nil, nil)
 	if err != nil {
 		panic(err)
 	}
@@ -66,6 +68,24 @@ func main() {
 	viewMat := mgl32.LookAtV(cameraPos.Add(mgl32.Vec3{0, 40, 0}), cameraPos, mgl32.Vec3{0, 1, 0})
 	camera := rendering.Camera{&cameraPos, &projectionMat, &viewMat}
 
+	text.Init(window)
+
+	frameRateText := text.New("Test", text.GetFont("8bitmadness", 30), mgl32.Vec2{380, 280}, mgl32.Vec3{1, 1, 1})
+	defer frameRateText.Release()
+
+	var frameRateEnable = false
+	frameRateText.Hide()
+	input.RegisterKeyBinding(glfw.KeyGraveAccent, "Toggle Test Text", func(w *glfw.Window, action glfw.Action, mods glfw.ModifierKey) {
+		if action == glfw.Release {
+			if frameRateEnable {
+				frameRateText.Hide()
+			} else {
+				frameRateText.Show()
+			}
+			frameRateEnable = !frameRateEnable
+		}
+	})
+
 	tile.InitTileRendering(camera)
 
 	curMap := maps.CreateEmptyMap(startMapSize)
@@ -81,6 +101,8 @@ func main() {
 
 	// angle := 0.0
 	previousTime := time.Now()
+	averageFrameRate := 0
+	frameCount := 0
 
 	rendering.RegisterMapBindings(&camera)
 	maps.RegisterMapBindings(&curMap, &testTile, &camera)
@@ -96,6 +118,13 @@ func main() {
 		curTime := time.Now()
 		deltaTime := curTime.Sub(previousTime).Seconds()
 		previousTime = curTime
+		averageFrameRate += int(1 / deltaTime)
+		if frameCount%5 == 0 {
+			frameRateText.SetString(strconv.Itoa(averageFrameRate / 5))
+			averageFrameRate = 0
+
+		}
+		frameCount++
 
 		//angle += deltaTime
 		// model := mgl32.HomogRotate3D(float32(angle), mgl32.Vec3{0, 1, 0})
@@ -108,12 +137,13 @@ func main() {
 		tile.SetTileUniforms(viewMat)
 		testTile.Render()
 		curMap.Render(deltaTime)
+		frameRateText.Draw()
 
 		// Maintenance
 		window.SwapBuffers()
 		glfw.PollEvents()
 
-		curFrameTime := time.Now().Sub(previousTime)
+		curFrameTime := time.Now().Sub(curTime)
 		if curFrameTime.Seconds() < 1/frameRate {
 			time.Sleep(time.Duration((1.0/(frameRate) - curFrameTime.Seconds()) * float64(time.Second)))
 		}
